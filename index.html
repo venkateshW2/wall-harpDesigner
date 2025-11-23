@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wall Harp Simulator - String Instrument Tunning Helper </title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@200;300;400;600&display=swap" rel="stylesheet">
+
+    <!-- External Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Collapsible Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <button class="sidebar-toggle" id="sidebarToggle">
+                <span class="toggle-icon">[ ← ]</span>
+            </button>
+
+            <div class="sidebar-content">
+                <header class="sidebar-header">
+                    <h1 class="app-title">WALL HARP</h1>
+                    <div class="app-subtitle">String Instrument Tunning Helper</div>
+                </header>
+
+                <!-- PROJECT MANAGEMENT -->
+                <section class="sidebar-section">
+                    <h2 class="section-title">PROJECT</h2>
+                    <div class="section-content">
+                        <div class="button-group">
+                            <button id="saveProject" class="btn btn-secondary">SAVE PROJECT</button>
+                            <button id="loadProject" class="btn btn-secondary">LOAD PROJECT</button>
+                        </div>
+                        <input type="file" id="loadProjectFile" accept=".json" style="display: none;">
+                        <div class="control-hint">Save and load complete instrument configurations</div>
+                    </div>
+                </section>
+
+                <!-- AUDIO SYSTEM -->
+                <section class="sidebar-section">
+                    <h2 class="section-title">AUDIO</h2>
+                    <div class="section-content">
+                        <button id="initAudio" class="btn btn-primary">INITIALIZE SYSTEM</button>
+                        <div class="status-line" id="audioStatus">
+                            <span class="status-label">STATUS:</span>
+                            <span class="status-value">STANDBY</span>
+                        </div>
+
+                        <div class="control-row">
+                            <label class="control-label">ENGINE</label>
+                        </div>
+                        <select id="audioEngine" class="select-field">
+                            <option value="karplus">KARPLUS-STRONG (PLUCKED)</option>
+                            <option value="piano">PIANO</option>
+                            <option value="sine">SINE WAVE</option>
+                            <option value="saw">SAWTOOTH</option>
+                            <option value="square">SQUARE WAVE</option>
+                            <option value="triangle">TRIANGLE WAVE</option>
+                        </select>
+                        <div class="control-hint">Select synthesis method</div>
+                    </div>
+                </section>
+
+                <!-- ADSR ENVELOPE -->
+                <section class="sidebar-section collapsed">
+                    <h2 class="section-title">ADSR ENVELOPE</h2>
+                    <div class="section-content">
+                        <div class="control-row">
+                            <label class="control-label">ATTACK</label>
+                            <span class="control-value" id="attackValue">0.01 s</span>
+                        </div>
+                        <input type="range" id="attackTime" class="range-slider" min="0" max="1000" step="10" value="10">
+
+                        <div class="control-row">
+                            <label class="control-label">DECAY</label>
+                            <span class="control-value" id="decayValue">0.3 s</span>
+                        </div>
+                        <input type="range" id="decayTime" class="range-slider" min="0" max="2000" step="50" value="300">
+
+                        <div class="control-row">
+                            <label class="control-label">SUSTAIN</label>
+                            <span class="control-value" id="sustainValue">0.5</span>
+                        </div>
+                        <input type="range" id="sustainLevel" class="range-slider" min="0" max="100" step="5" value="50">
+
+                        <div class="control-row">
+                            <label class="control-label">RELEASE</label>
+                            <span class="control-value" id="releaseValue">1.0 s</span>
+                        </div>
+                        <input type="range" id="releaseTime" class="range-slider" min="0" max="5000" step="100" value="1000">
+
+                        <div class="control-hint">Control amplitude envelope shape</div>
+                    </div>
+                </section>
+
+                <!-- FILTER -->
+                <section class="sidebar-section collapsed">
+                    <h2 class="section-title">FILTER</h2>
+                    <div class="section-content">
+                        <div class="control-row">
+                            <label class="control-label">FILTER TYPE</label>
+                        </div>
+                        <select id="filterType" class="select-field">
+                            <option value="lowpass">LOW PASS</option>
+                            <option value="highpass">HIGH PASS</option>
+                            <option value="bandpass">BAND PASS</option>
+                            <option value="notch">NOTCH</option>
+                        </select>
+
+                        <div class="control-row">
+                            <label class="control-label">CUTOFF FREQUENCY</label>
+                            <span class="control-value" id="filterFreqValue">2000 Hz</span>
+                        </div>
+                        <input type="range" id="filterFrequency" class="range-slider" min="100" max="10000" step="100" value="2000">
+
+                        <div class="control-row">
+                            <label class="control-label">RESONANCE (Q)</label>
+                            <span class="control-value" id="filterQValue">1.0</span>
+                        </div>
+                        <input type="range" id="filterQ" class="range-slider" min="0.1" max="20" step="0.1" value="1.0">
+
+                        <div class="control-hint">Shape the frequency spectrum</div>
+                    </div>
+                </section>
+
+
+                <!-- STRING CONFIGURATION -->
+                <section class="sidebar-section">
+                    <h2 class="section-title">STRING COUNT</h2>
+                    <div class="section-content">
+                        <div class="control-row">
+                            <label class="control-label">COUNT</label>
+                            <span class="control-value" id="stringCountValue">36</span>
+                        </div>
+                        <input type="range" id="stringCount" class="range-slider" min="12" max="144" step="12" value="36">
+                        <div class="range-markers">
+                            <span>12</span>
+                            <span>72</span>
+                            <span>144</span>
+                        </div>
+                        <div class="control-hint">Octave loops automatically repeat</div>
+                    </div>
+                </section>
+
+                <!-- STRING DATA -->
+                <section class="sidebar-section">
+                    <h2 class="section-title">SELECTED STRING DATA</h2>
+                    <div class="section-content">
+                        <div class="control-hint" style="margin-bottom: 10px;">
+                            <span id="selectionCount">1 string selected</span> | Hold Ctrl/Cmd to select multiple
+                        </div>
+                        <div class="data-grid">
+                            <div class="data-item">
+                                <span class="data-label">STRING #</span>
+                                <span class="data-value" id="stringNumber">--</span>
+                            </div>
+                            <div class="data-item">
+                                <span class="data-label">NOTE</span>
+                                <span class="data-value" id="currentNote">--</span>
+                            </div>
+                            <div class="data-item">
+                                <span class="data-label">FREQUENCY</span>
+                                <span class="data-value" id="currentFreq">--</span>
+                            </div>
+                            <div class="data-item">
+                                <span class="data-label">MIDI</span>
+                                <span class="data-value" id="midiNote">--</span>
+                            </div>
+                            <div class="data-item">
+                                <span class="data-label">TUNING</span>
+                                <span class="data-value" id="centsDeviation">--</span>
+                            </div>
+                            <div class="data-item">
+                                <span class="data-label">LENGTH</span>
+                                <span class="data-value" id="playableLength">--</span>
+                            </div>
+                            <div class="data-item">
+                                <span class="data-label">CAPO LOWER</span>
+                                <span class="data-value" id="lowerCapo">--</span>
+                            </div>
+                            <div class="data-item">
+                                <span class="data-label">CAPO UPPER</span>
+                                <span class="data-value" id="upperCapo">--</span>
+                            </div>
+                        </div>
+
+                        <div class="control-row" style="margin-top: 15px;">
+                            <label class="control-label">STRING MATERIAL</label>
+                        </div>
+                        <select id="selectedStringMaterial" class="select-field">
+                            <option value="steel">STEEL</option>
+                            <option value="nylon">NYLON</option>
+                            <option value="gut">GUT</option>
+                            <option value="bronze">BRONZE</option>
+                            <option value="phosphorBronze">PHOSPHOR BRONZE</option>
+                        </select>
+
+                        <div class="control-row">
+                            <label class="control-label">STRING GAUGE</label>
+                        </div>
+                        <select id="selectedStringGauge" class="select-field">
+                            <option value="extraLight">EXTRA LIGHT</option>
+                            <option value="light">LIGHT</option>
+                            <option value="medium">MEDIUM</option>
+                            <option value="heavy">HEAVY</option>
+                            <option value="extraHeavy">EXTRA HEAVY</option>
+                        </select>
+
+                        <div class="control-row">
+                            <label class="control-label">STRING TENSION</label>
+                            <span class="control-value" id="selectedStringTensionValue">120 N</span>
+                        </div>
+                        <input type="range" id="selectedStringTension" class="range-slider" min="40" max="150" step="5" value="120">
+
+                        <div class="button-group">
+                            <button id="applySelectedStringMaterial" class="btn btn-secondary">APPLY TO SELECTED</button>
+                            <button id="applyAllStringsMaterial" class="btn btn-secondary">APPLY TO ALL</button>
+                        </div>
+                        <div class="control-hint">Apply material properties to selected strings or all strings</div>
+                    </div>
+                </section>
+
+                <!-- INTERACTION MODE -->
+                <section class="sidebar-section">
+                    <h2 class="section-title">INTERACTION MODE</h2>
+                    <div class="section-content">
+                        <div class="mode-selector">
+                            <button class="mode-btn active" data-mode="pluck">[PLUCK]</button>
+                            <button class="mode-btn" data-mode="adjust">[ADJUST]</button>
+                            <button class="mode-btn" data-mode="pattern">[PATTERN]</button>
+                        </div>
+                        <div class="control-hint">
+                            PLUCK: Click to hear • ADJUST: Drag capos • PATTERN: Apply waveforms
+                        </div>
+                    </div>
+                </section>
+
+                <!-- DIRECT TUNING -->
+                <section class="sidebar-section collapsed">
+                    <h2 class="section-title">DIRECT TUNING</h2>
+                    <div class="section-content">
+                        <input type="text" id="noteInput" class="text-field" placeholder="C4 / 261.63 Hz">
+                        <button id="applyNote" class="btn btn-secondary">APPLY TO SELECTED</button>
+                        <div class="button-group">
+                            <button id="semitoneDown" class="btn btn-small">-1 SEMITONE</button>
+                            <button id="semitoneUp" class="btn btn-small">+1 SEMITONE</button>
+                        </div>
+                        <div class="button-group">
+                            <button id="octaveDown" class="btn btn-small">-1 OCTAVE (PageDown)</button>
+                            <button id="octaveUp" class="btn btn-small">+1 OCTAVE (PageUp)</button>
+                        </div>
+                        <div class="control-hint">Fine-tune individual strings | Use keyboard shortcuts</div>
+                    </div>
+                </section>
+
+                <!-- TUNING PRESETS -->
+                <section class="sidebar-section collapsed">
+                    <h2 class="section-title">TUNING PRESETS</h2>
+                    <div class="section-content">
+                        <div class="control-row">
+                            <label class="control-label">ROOT NOTE</label>
+                        </div>
+                        <select id="rootNoteSelect" class="select-field">
+                            <option value="36">C2 (MIDI 36)</option>
+                            <option value="37">C#2 (MIDI 37)</option>
+                            <option value="38">D2 (MIDI 38)</option>
+                            <option value="39">D#2 (MIDI 39)</option>
+                            <option value="40">E2 (MIDI 40)</option>
+                            <option value="41">F2 (MIDI 41)</option>
+                            <option value="42">F#2 (MIDI 42)</option>
+                            <option value="43">G2 (MIDI 43)</option>
+                            <option value="44">G#2 (MIDI 44)</option>
+                            <option value="45">A2 (MIDI 45)</option>
+                            <option value="46">A#2 (MIDI 46)</option>
+                            <option value="47">B2 (MIDI 47)</option>
+                            <option value="48">C3 (MIDI 48)</option>
+                        </select>
+                        <div class="control-hint">Starting note for scale presets</div>
+
+                        <div class="preset-list">
+                            <button class="preset-item" data-scale="chromatic">CHROMATIC (12 notes/octave)</button>
+                            <button class="preset-item" data-scale="major">MAJOR (7 notes/octave)</button>
+                            <button class="preset-item" data-scale="minor">MINOR (7 notes/octave)</button>
+                            <button class="preset-item" data-scale="pentatonicMajor">PENTATONIC MAJOR (5 notes)</button>
+                            <button class="preset-item" data-scale="pentatonicMinor">PENTATONIC MINOR (5 notes)</button>
+                            <button class="preset-item" data-scale="blues">BLUES (6 notes)</button>
+                            <button class="preset-item" data-scale="wholeTone">WHOLE TONE (6 notes)</button>
+                            <button class="preset-item" data-scale="harmonicMinor">HARMONIC MINOR (7 notes)</button>
+                            <button class="preset-item" data-scale="dorian">DORIAN MODE (7 notes)</button>
+                            <button class="preset-item" data-scale="lydian">LYDIAN MODE (7 notes)</button>
+                            <button class="preset-item" data-scale="mixolydian">MIXOLYDIAN MODE (7 notes)</button>
+                            <button class="preset-item" data-scale="harmonicSeries">HARMONIC SERIES (10 notes)</button>
+                        </div>
+                        <div class="control-row">
+                            <label class="control-label">SCL LIBRARY</label>
+                        </div>
+                        <select id="sclLibrarySelect" class="select-field">
+                            <option value="">-- Select SCL File --</option>
+                        </select>
+                        <button id="applySclFile" class="btn btn-secondary">APPLY SCL FILE</button>
+
+                        <button id="importScala" class="btn btn-secondary">IMPORT CUSTOM SCL FILE</button>
+                        <input type="file" id="scalaFileInput" accept=".scl" style="display: none;">
+                        <div class="control-hint">Scales loop across 6 octaves automatically</div>
+                    </div>
+                </section>
+
+                <!-- WAVEFORM PATTERNS -->
+                <section class="sidebar-section collapsed">
+                    <h2 class="section-title">WAVEFORM PATTERNS</h2>
+                    <div class="section-content">
+                        <select id="waveformType" class="select-field">
+                            <option value="sine">SINE WAVE</option>
+                            <option value="sawtooth">SAWTOOTH</option>
+                            <option value="triangle">TRIANGLE</option>
+                            <option value="square">SQUARE</option>
+                            <option value="random">RANDOM</option>
+                        </select>
+                        <div class="control-row">
+                            <label class="control-label">AMPLITUDE</label>
+                            <span class="control-value" id="waveAmplitudeVal">400mm</span>
+                        </div>
+                        <input type="range" id="waveAmplitude" class="range-slider" min="100" max="800" step="50" value="400">
+                        <button id="applyWaveform" class="btn btn-secondary">APPLY PATTERN</button>
+                        <div class="control-hint">Apply geometric patterns to capo positions</div>
+                    </div>
+                </section>
+
+                <!-- SOUND SETTINGS -->
+                <section class="sidebar-section collapsed">
+                    <h2 class="section-title">SOUND SETTINGS</h2>
+                    <div class="section-content">
+                        <div class="control-row">
+                            <label class="control-label">REVERB TIME</label>
+                            <span class="control-value" id="reverbDecayVal">3.5s</span>
+                        </div>
+                        <input type="range" id="reverbDecay" class="range-slider" min="0.5" max="8" step="0.1" value="3.5">
+
+                        <div class="control-row">
+                            <label class="control-label">REVERB MIX</label>
+                            <span class="control-value" id="reverbWetVal">40%</span>
+                        </div>
+                        <input type="range" id="reverbWet" class="range-slider" min="0" max="1" step="0.01" value="0.4">
+
+                        <div class="control-row">
+                            <label class="control-label">ATTACK</label>
+                            <span class="control-value" id="attackNoiseVal">1.5</span>
+                        </div>
+                        <input type="range" id="attackNoise" class="range-slider" min="0.5" max="3" step="0.1" value="1.5">
+
+                        <div class="control-row">
+                            <label class="control-label">RESONANCE</label>
+                            <span class="control-value" id="resonanceVal">0.97</span>
+                        </div>
+                        <input type="range" id="resonance" class="range-slider" min="0.9" max="0.99" step="0.01" value="0.97">
+
+                        <div class="control-hint">Fine-tune audio characteristics</div>
+                    </div>
+                </section>
+
+                <!-- EXPORT / IMPORT -->
+                <section class="sidebar-section collapsed">
+                    <h2 class="section-title">EXPORT / IMPORT</h2>
+                    <div class="section-content">
+                        <button id="exportCSV" class="btn btn-secondary">EXPORT CSV DATA</button>
+                        <button id="exportBtn" class="btn btn-secondary">EXPORT JSON CONFIG</button>
+                        <button id="importBtn" class="btn btn-secondary">IMPORT JSON CONFIG</button>
+                        <input type="file" id="fileInput" accept=".json" style="display: none;">
+                        <div class="control-hint">Save and load complete configurations</div>
+                    </div>
+                </section>
+
+                <!-- THEME -->
+                <section class="sidebar-section collapsed">
+                    <h2 class="section-title">APPEARANCE</h2>
+                    <div class="section-content">
+                        <div class="theme-selector">
+                            <button id="themeDark" class="theme-btn">DARK</button>
+                            <button id="themeLight" class="theme-btn active">LIGHT</button>
+                        </div>
+                        <div class="control-hint">Canvas is always white for clarity</div>
+                    </div>
+                </section>
+
+                <!-- FOOTER -->
+                <div class="sidebar-footer">
+                    <div class="footer-info">v2.0 | PHYSICS-BASED STRING MODELING</div>
+                    <div class="footer-info">SEE STRING_MATERIALS.MD FOR DETAILS</div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- MAIN CANVAS AREA -->
+        <main class="main-canvas" id="mainCanvas">
+            <div class="canvas-wrapper" id="canvasWrapper">
+                <div id="canvasContainer"></div>
+            </div>
+
+            <!-- Canvas Overlay Info -->
+            <div class="canvas-overlay">
+                <div class="overlay-info">
+                    <span id="materialInfo">STEEL 0.50mm @ 120N</span>
+                    <span class="separator">|</span>
+                    <span id="modeInfo">MODE: PLUCK</span>
+                    <span class="separator">|</span>
+                    <span id="stringInfo">SELECT A STRING</span>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- JavaScript Modules -->
+    <script src="constants.js"></script>
+    <script src="physics.js"></script>
+    <script src="audio.js"></script>
+    <script src="string.js"></script>
+    <script src="utils.js"></script>
+    <script src="visualization.js"></script>
+    <script src="interaction.js"></script>
+    <script src="ui.js"></script>
+    <script src="main.js"></script>
+</body>
+</html>
