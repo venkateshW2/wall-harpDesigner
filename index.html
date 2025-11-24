@@ -40,6 +40,46 @@
                     </div>
                 </section>
 
+                <!-- WALL DIMENSIONS -->
+                <section class="sidebar-section">
+                    <h2 class="section-title">WALL DIMENSIONS</h2>
+                    <div class="section-content">
+                        <div class="control-row">
+                            <label class="control-label">WIDTH (FEET)</label>
+                            <span class="control-value" id="wallWidthValue">25.7 ft</span>
+                        </div>
+                        <input type="number" id="wallWidth" class="input-field" min="5" max="100" step="0.1" value="25.7">
+
+                        <div class="control-row">
+                            <label class="control-label">HEIGHT (FEET)</label>
+                            <span class="control-value" id="wallHeightValue">7.0 ft</span>
+                        </div>
+                        <input type="number" id="wallHeight" class="input-field" min="3" max="30" step="0.1" value="7.0">
+
+                        <button id="applyWallDimensions" class="btn btn-primary">APPLY DIMENSIONS</button>
+
+                        <div class="info-row">
+                            <span class="info-label">MAX STRINGS:</span>
+                            <span class="info-value" id="maxStringsValue">783</span>
+                        </div>
+
+                        <div class="info-row">
+                            <span class="info-label">STRING SPACING:</span>
+                            <span class="info-value" id="stringSpacingValue">217.5 mm</span>
+                        </div>
+
+                        <div class="button-group">
+                            <button id="toggleReverseCapo" class="btn btn-secondary">REVERSE CAPO MODE</button>
+                        </div>
+                        <div class="status-line" id="reverseCapoStatus">
+                            <span class="status-label">REVERSE:</span>
+                            <span class="status-value">OFF</span>
+                        </div>
+
+                        <div class="control-hint">Set wall size, calculate max strings, and reverse capo positions</div>
+                    </div>
+                </section>
+
                 <!-- AUDIO SYSTEM -->
                 <section class="sidebar-section">
                     <h2 class="section-title">AUDIO</h2>

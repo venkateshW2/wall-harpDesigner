@@ -173,17 +173,19 @@ function drawString(p, string, isSelected) {
     const lowerCapoY = mmToScreenY(string.lowerCapoMm, p.height);
     const upperCapoY = mmToScreenY(string.upperCapoMm, p.height);
 
-    // Always show string number and note name
-    p.fill(VISUAL_CONSTANTS.COLORS.text);
+    // Always show string number and note name - black for readability
+    p.fill(0, 0, 0);
     p.noStroke();
     p.textAlign(p.CENTER, p.BOTTOM);
-    p.textSize(10);
+    p.textSize(VISUAL_CONSTANTS.FONT_SIZES.stringNote);
+    p.textStyle(p.BOLD);
     p.text(string.noteName, x, topBridgeY - 5);
 
     // String number and X-distance from string #1
     p.textAlign(p.CENTER, p.TOP);
-    p.textSize(10);
-    p.fill(VISUAL_CONSTANTS.COLORS.textDim);
+    p.textSize(VISUAL_CONSTANTS.FONT_SIZES.stringNumber);
+    p.textStyle(p.BOLD);
+    p.fill(0, 0, 0);
 
     // Calculate distance from first string (string #1 is at position 0)
     const distanceFromFirstMm = string.index * (PHYSICS_CONSTANTS.WALL_WIDTH / string.totalStrings);
@@ -194,49 +196,61 @@ function drawString(p, string, isSelected) {
     p.textSize(9);
     p.text(distanceFromFirstInches + '"', x, soundboxY + 18);
 
-    // Get material color for this string
+    // Get material color for this string - make it matte (reduce brightness)
     const materialColor = string.color || VISUAL_CONSTANTS.COLORS.stringInactive;
+    // Reduce brightness by 20% for matte look
+    const matteColor = [
+        Math.floor(materialColor[0] * 0.8),
+        Math.floor(materialColor[1] * 0.8),
+        Math.floor(materialColor[2] * 0.8)
+    ];
 
     // Calculate string thickness based on gauge
     const gaugeData = STRING_GAUGES[string.gauge];
-    const baseThickness = gaugeData ? (gaugeData.diameter * 10) : 4; // Increased scale for better visibility
-    const fullStringThickness = Math.max(3, baseThickness * 0.8); // Increased from 0.5 to 0.8 for better visibility
-    const playableThickness = Math.max(4, baseThickness * 1.2); // Increased for better material color visibility
+    const baseThickness = gaugeData ? (gaugeData.diameter * 10) : 4;
+    const fullStringThickness = Math.max(3, baseThickness * 0.8);
+    const playableThickness = Math.max(4, baseThickness * 1.2);
 
-    // Draw FULL string (from top to bottom) - thickness based on gauge, full color opacity
-    p.stroke(materialColor[0], materialColor[1], materialColor[2], 255);
+    // Draw NON-PLAYABLE sections (outside capos) with reduced opacity (30%)
+    // Top section (from top bridge to upper capo)
+    p.stroke(matteColor[0], matteColor[1], matteColor[2], 80);
     p.strokeWeight(fullStringThickness);
-    p.line(x, soundboxY, x, topBridgeY);
+    p.line(x, topBridgeY, x, upperCapoY);
 
-    // Draw playable section (active vibrating portion) - thicker, highlight it
+    // Bottom section (from lower capo to soundbox)
+    p.stroke(matteColor[0], matteColor[1], matteColor[2], 80);
+    p.strokeWeight(fullStringThickness);
+    p.line(x, lowerCapoY, x, soundboxY);
+
+    // Draw PLAYABLE section (between capos) - thicker, full matte color
     if (string.isPlaying) {
         // Animated vibration effect
         const vibrationAmount = string.playingAmplitude * 5;
         const vibrationX = x + p.sin(p.frameCount * 0.3) * vibrationAmount;
 
-        // Glow effect for playing string - brighter material color
-        p.stroke(materialColor[0], materialColor[1], materialColor[2], 150);
+        // Glow effect for playing string
+        p.stroke(matteColor[0], matteColor[1], matteColor[2], 120);
         p.strokeWeight(playableThickness * 3);
         p.line(vibrationX, lowerCapoY, vibrationX, upperCapoY);
 
-        // Main vibrating string - full material color, thicker based on gauge
-        p.stroke(materialColor[0], materialColor[1], materialColor[2], 255);
+        // Main vibrating string - full matte color
+        p.stroke(matteColor[0], matteColor[1], matteColor[2], 255);
         p.strokeWeight(playableThickness * 1.8);
         p.line(vibrationX, lowerCapoY, vibrationX, upperCapoY);
 
     } else {
-        // Static string - use material color or selection color, thickness based on gauge
+        // Static string - use matte color
         if (isSelected) {
-            // Selected: show material color with black outline
+            // Selected: show matte color with black outline
             p.stroke(0, 0, 0); // Black outline
             p.strokeWeight(playableThickness * 1.6);
             p.line(x, lowerCapoY, x, upperCapoY);
 
-            p.stroke(materialColor[0], materialColor[1], materialColor[2], 255); // Material color
+            p.stroke(matteColor[0], matteColor[1], matteColor[2], 255); // Full matte color
             p.strokeWeight(playableThickness * 1.3);
             p.line(x, lowerCapoY, x, upperCapoY);
         } else {
-            p.stroke(materialColor[0], materialColor[1], materialColor[2], 255);
+            p.stroke(matteColor[0], matteColor[1], matteColor[2], 220);
             p.strokeWeight(playableThickness);
             p.line(x, lowerCapoY, x, upperCapoY);
         }
@@ -300,14 +314,49 @@ function drawCapo(p, x, y, isDragging) {
  * @param {number} numStrings - Number of strings
  */
 function drawUIOverlay(p, mode, numStrings) {
-    // String count at top right
-    p.fill(VISUAL_CONSTANTS.COLORS.text);
+    // String count at top right - black for readability
+    p.fill(0, 0, 0);
     p.textAlign(p.RIGHT, p.TOP);
     p.textSize(VISUAL_CONSTANTS.FONT_SIZES.label);
     p.text(numStrings + ' STRINGS', p.width - 15, 15);
 
     // Note: Mode and material info now displayed in HTML overlay at bottom
     // Removed canvas text to avoid overlap
+}
+
+/**
+ * Draw currently playing string info on canvas
+ *
+ * @param {p5} p - p5.js instance
+ * @param {Array<HarpString>} strings - Array of all strings
+ */
+function drawPlayingStringInfo(p, strings) {
+    // Find all currently playing strings
+    const playingStrings = strings.filter(s => s.isPlaying);
+
+    if (playingStrings.length === 0) return;
+
+    // Simple text display at top center with more padding
+    const x = p.width / 2;
+    const y = 15;  // Moved up slightly for more space
+
+    p.textAlign(p.CENTER, p.TOP);
+    p.textStyle(p.BOLD);
+    p.noStroke();
+
+    // Show only the first playing string to keep it simple
+    const string = playingStrings[0];
+
+    // String number and note in one line - black for readability
+    p.textSize(20);
+    p.fill(0, 0, 0);  // Black instead of grey
+    const freq = string.targetFrequency.toFixed(1);
+    const cents = parseFloat(string.centsDeviation).toFixed(1);
+    const centsText = cents > 0 ? '+' + cents : cents;
+
+    p.text(`#${string.index + 1}: ${string.noteName} | ${freq}Hz | ${centsText}¢`, x, y);
+
+    p.textStyle(p.NORMAL); // Reset to normal
 }
 
 /**
@@ -328,12 +377,13 @@ function drawKeyboardShortcuts(p) {
     ];
 
     const x = p.width - 15;
-    const startY = 50;
+    const startY = 60;  // Increased from 50 for more padding
     const lineHeight = 16;
 
     p.textAlign(p.RIGHT, p.TOP);
-    p.textSize(11);
-    p.fill(VISUAL_CONSTANTS.COLORS.textDim);
+    p.textSize(13);
+    p.textStyle(p.BOLD);
+    p.fill(0, 0, 0);  // Black for readability
 
     shortcuts.forEach((shortcut, index) => {
         p.text(shortcut, x, startY + (index * lineHeight));

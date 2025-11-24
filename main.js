@@ -11,6 +11,13 @@ class WallHarpSimulator {
         this.selectedStringIndex = 0;
         this.initialized = false;
 
+        // Wall dimensions (in feet, converted to mm internally)
+        this.wallWidthFt = PHYSICS_CONSTANTS.DEFAULT_WALL_WIDTH_FT;
+        this.wallHeightFt = PHYSICS_CONSTANTS.DEFAULT_WALL_HEIGHT_FT;
+        this.wallWidthMm = this.wallWidthFt * 304.8;
+        this.wallHeightMm = this.wallHeightFt * 304.8;
+        this.reverseCapoMode = false;
+
         // Material properties
         this.currentMaterial = PHYSICS_CONSTANTS.DEFAULT_MATERIAL;
         this.currentGauge = PHYSICS_CONSTANTS.DEFAULT_GAUGE;
@@ -175,6 +182,9 @@ class WallHarpSimulator {
         // Draw UI overlay (not affected by zoom/pan)
         drawUIOverlay(p, this.interactionManager.mode, this.numStrings);
 
+        // Draw currently playing string info (not affected by zoom/pan)
+        drawPlayingStringInfo(p, this.strings);
+
         // Draw keyboard shortcuts (not affected by zoom/pan)
         drawKeyboardShortcuts(p);
 
@@ -269,10 +279,24 @@ class WallHarpSimulator {
         if (selectedString) {
             updateInfoPanel(selectedString, selectionCount);
         }
+
+        // Update wall dimension displays
+        const maxStringsValue = document.getElementById('maxStringsValue');
+        const stringSpacingValue = document.getElementById('stringSpacingValue');
+        if (maxStringsValue) {
+            maxStringsValue.textContent = this.calculateMaxStrings();
+        }
+        if (stringSpacingValue) {
+            stringSpacingValue.textContent = this.getStringSpacing().toFixed(1) + ' mm';
+        }
     }
 
     setStringCount(count) {
+        console.log("=== SET STRING COUNT ===");
         console.log("Setting string count to:", count);
+        console.log("Current WALL_WIDTH:", PHYSICS_CONSTANTS.WALL_WIDTH);
+        console.log("Current FULL_STRING_LENGTH:", PHYSICS_CONSTANTS.FULL_STRING_LENGTH);
+
         this.numStrings = count;
         this.strings = createChromaticStrings(
             count,
@@ -281,13 +305,20 @@ class WallHarpSimulator {
             this.currentTension
         );
         this.interactionManager.strings = this.strings;
+
+        // Reset selection to first string and update selection state
         this.selectedStringIndex = 0;
         this.interactionManager.selectedStringIndex = 0;
+        this.interactionManager.selectedStringIndices = [0];
+        this.interactionManager.updateSelection();
 
         if (audioEngine && audioEngine.initialized) {
             audioEngine.dispose();
             audioEngine.initialize(count);
         }
+
+        console.log("✓ Strings created. First string totalStrings:", this.strings[0].totalStrings);
+        console.log("✓ Selection updated. Selected indices:", this.interactionManager.selectedStringIndices);
 
         this.updateUI();
     }
@@ -298,8 +329,16 @@ class WallHarpSimulator {
     }
 
     applyScalePreset(scaleName, rootMidi) {
+        console.log("=== APPLY SCALE PRESET ===");
+        console.log(`Scale: ${scaleName}, Root MIDI: ${rootMidi || 48}`);
+        console.log(`Current FULL_STRING_LENGTH: ${PHYSICS_CONSTANTS.FULL_STRING_LENGTH}mm`);
+        console.log(`Strings before: ${this.strings.length}`);
+
         rootMidi = rootMidi || 48;
         applyScale(this.strings, scaleName, rootMidi);
+
+        console.log(`First string after scale: lowerCapo=${this.strings[0].lowerCapoMm}mm, upperCapo=${this.strings[0].upperCapoMm}mm, note=${this.strings[0].noteName}`);
+
         this.updateUI();
 
         const scale = SCALES[scaleName];
@@ -332,6 +371,13 @@ class WallHarpSimulator {
             this.currentTension
         );
         this.interactionManager.strings = this.strings;
+
+        // Reset selection and update selection state
+        this.selectedStringIndex = 0;
+        this.interactionManager.selectedStringIndex = 0;
+        this.interactionManager.selectedStringIndices = [0];
+        this.interactionManager.updateSelection();
+
         this.updateUI();
         showNotification('Reset to chromatic tuning', 'success');
     }
@@ -366,6 +412,105 @@ class WallHarpSimulator {
         if (audioEngine && audioEngine.initialized) {
             audioEngine.setEngineType(engineType);
         }
+    }
+
+    setWallDimensions(widthFt, heightFt) {
+        console.log("=== SET WALL DIMENSIONS ===");
+        console.log(`Changing from ${this.wallWidthFt}ft x ${this.wallHeightFt}ft to ${widthFt}ft x ${heightFt}ft`);
+
+        this.wallWidthFt = widthFt;
+        this.wallHeightFt = heightFt;
+        this.wallWidthMm = widthFt * 304.8;
+        this.wallHeightMm = heightFt * 304.8;
+
+        // Update physics constants
+        const oldWallWidth = PHYSICS_CONSTANTS.WALL_WIDTH;
+        const oldStringLength = PHYSICS_CONSTANTS.FULL_STRING_LENGTH;
+
+        PHYSICS_CONSTANTS.WALL_WIDTH = this.wallWidthMm;
+        PHYSICS_CONSTANTS.FULL_STRING_LENGTH = this.wallHeightMm;
+
+        console.log(`PHYSICS_CONSTANTS.WALL_WIDTH: ${oldWallWidth}mm → ${PHYSICS_CONSTANTS.WALL_WIDTH}mm`);
+        console.log(`PHYSICS_CONSTANTS.FULL_STRING_LENGTH: ${oldStringLength}mm → ${PHYSICS_CONSTANTS.FULL_STRING_LENGTH}mm`);
+
+        // Recalculate maximum strings based on minimum spacing
+        const maxStrings = this.calculateMaxStrings();
+        console.log(`Maximum strings with 1cm spacing: ${maxStrings}`);
+
+        // If current string count exceeds max, adjust it
+        if (this.numStrings > maxStrings) {
+            console.warn(`Current string count (${this.numStrings}) exceeds maximum (${maxStrings}). Adjusting...`);
+            this.setStringCount(maxStrings);
+        } else {
+            console.log(`Recreating ${this.numStrings} strings with new dimensions...`);
+
+            // Recreate strings with new dimensions
+            this.strings = createChromaticStrings(
+                this.numStrings,
+                this.currentMaterial,
+                this.currentGauge,
+                this.currentTension
+            );
+            this.interactionManager.strings = this.strings;
+
+            console.log(`✓ Created strings. First string: lowerCapo=${this.strings[0].lowerCapoMm}mm, upperCapo=${this.strings[0].upperCapoMm}mm`);
+
+            // Reset selection to first string and update selection state
+            this.selectedStringIndex = 0;
+            this.interactionManager.selectedStringIndex = 0;
+            this.interactionManager.selectedStringIndices = [0];
+            this.interactionManager.updateSelection();
+
+            console.log("✓ Selection reset complete");
+        }
+
+        this.updateUI();
+        showNotification(`Wall: ${widthFt}ft x ${heightFt}ft | Max strings: ${maxStrings}`, 'success');
+    }
+
+    calculateMaxStrings() {
+        // Calculate maximum number of strings based on wall width and minimum spacing
+        const maxStrings = Math.floor(this.wallWidthMm / PHYSICS_CONSTANTS.MIN_STRING_SPACING);
+        return maxStrings;
+    }
+
+    getStringSpacing() {
+        // Calculate actual spacing between strings
+        return this.wallWidthMm / this.numStrings;
+    }
+
+    toggleReverseCapoMode() {
+        this.reverseCapoMode = !this.reverseCapoMode;
+        console.log(`Reverse capo mode: ${this.reverseCapoMode ? 'ON' : 'OFF'}`);
+
+        // Recreate strings with reversed capo positions
+        this.strings = createChromaticStrings(
+            this.numStrings,
+            this.currentMaterial,
+            this.currentGauge,
+            this.currentTension
+        );
+
+        // Apply reverse if enabled
+        if (this.reverseCapoMode) {
+            this.strings.forEach((string) => {
+                // Swap capo positions
+                const temp = string.lowerCapoMm;
+                string.lowerCapoMm = string.upperCapoMm;
+                string.upperCapoMm = temp;
+            });
+        }
+
+        this.interactionManager.strings = this.strings;
+
+        // Reset selection and update selection state
+        this.selectedStringIndex = 0;
+        this.interactionManager.selectedStringIndex = 0;
+        this.interactionManager.selectedStringIndices = [0];
+        this.interactionManager.updateSelection();
+
+        this.updateUI();
+        showNotification(`Reverse capo mode: ${this.reverseCapoMode ? 'ON' : 'OFF'}`, 'info');
     }
 }
 

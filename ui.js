@@ -81,6 +81,62 @@ function updateInfoPanel(string, selectionCount = 1) {
  * @param {object} app - Main application instance
  */
 function initializeUIControls(app) {
+    // Wall dimensions controls
+    const wallWidth = document.getElementById('wallWidth');
+    const wallHeight = document.getElementById('wallHeight');
+    const wallWidthValue = document.getElementById('wallWidthValue');
+    const wallHeightValue = document.getElementById('wallHeightValue');
+    const applyWallDimensions = document.getElementById('applyWallDimensions');
+    const maxStringsValue = document.getElementById('maxStringsValue');
+    const stringSpacingValue = document.getElementById('stringSpacingValue');
+    const toggleReverseCapo = document.getElementById('toggleReverseCapo');
+    const reverseCapoStatus = document.getElementById('reverseCapoStatus');
+
+    if (wallWidth && wallWidthValue) {
+        wallWidth.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            wallWidthValue.textContent = value.toFixed(1) + ' ft';
+        });
+    }
+
+    if (wallHeight && wallHeightValue) {
+        wallHeight.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            wallHeightValue.textContent = value.toFixed(1) + ' ft';
+        });
+    }
+
+    if (applyWallDimensions && wallWidth && wallHeight) {
+        applyWallDimensions.addEventListener('click', () => {
+            const width = parseFloat(wallWidth.value);
+            const height = parseFloat(wallHeight.value);
+            app.setWallDimensions(width, height);
+
+            // Update display values
+            if (maxStringsValue) {
+                maxStringsValue.textContent = app.calculateMaxStrings();
+            }
+            if (stringSpacingValue) {
+                stringSpacingValue.textContent = app.getStringSpacing().toFixed(1) + ' mm';
+            }
+        });
+    }
+
+    if (toggleReverseCapo) {
+        toggleReverseCapo.addEventListener('click', () => {
+            app.toggleReverseCapoMode();
+
+            // Update status display
+            if (reverseCapoStatus) {
+                const statusValue = reverseCapoStatus.querySelector('.status-value');
+                if (statusValue) {
+                    statusValue.textContent = app.reverseCapoMode ? 'ON' : 'OFF';
+                    statusValue.style.color = app.reverseCapoMode ? '#00ff00' : '#666';
+                }
+            }
+        });
+    }
+
     // Audio initialization button
     const initAudioBtn = document.getElementById('initAudio');
     if (initAudioBtn) {

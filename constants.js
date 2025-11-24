@@ -57,8 +57,15 @@ const STRING_GAUGES = {
 
 // ===== PHYSICS CONSTANTS =====
 const PHYSICS_CONSTANTS = {
-    FULL_STRING_LENGTH: 2134,    // mm
-    WALL_WIDTH: 7830,            // mm
+    FULL_STRING_LENGTH: 2134,    // mm (default ~7 feet)
+    WALL_WIDTH: 7830,            // mm (default ~25.7 feet)
+
+    // Default wall dimensions in feet (converted to mm)
+    DEFAULT_WALL_WIDTH_FT: 25.7,
+    DEFAULT_WALL_HEIGHT_FT: 7.0,
+
+    // Minimum spacing for playable strings
+    MIN_STRING_SPACING: 10,      // mm (1cm minimum for playability)
 
     // Reference calibration (default steel, medium gauge)
     REFERENCE_FREQ: 114.8,
@@ -167,10 +174,12 @@ const VISUAL_CONSTANTS = {
     COLORS: null, // Will be set based on theme
 
     FONT_SIZES: {
-        title: 24,      // Increased from 16
-        label: 18,      // Increased from 13
-        value: 20,      // Increased from 14
-        small: 14       // Increased from 10
+        title: 28,      // Main titles
+        label: 22,      // Labels and shortcuts
+        value: 24,      // Values and info
+        small: 18,      // String numbers and notes
+        stringNote: 14, // Note names on canvas
+        stringNumber: 12 // String numbers on canvas
     }
 };
 
