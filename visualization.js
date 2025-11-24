@@ -287,53 +287,72 @@ function drawStringInDrawMode(p, string, isSelected, isHovered) {
 
     // Draw the string line
     if (string.isPlaying) {
-        // Animated vibration effect
-        const vibrationAmount = string.playingAmplitude * 5;
-        const midX = (string.startX + string.endX) / 2;
-        const midY = (string.startY + string.endY) / 2;
-
-        // Calculate perpendicular offset for vibration
+        // Wave-like vibration effect - physically accurate
+        const vibrationAmount = string.playingAmplitude * 8;
         const dx = string.endX - string.startX;
         const dy = string.endY - string.startY;
         const length = Math.sqrt(dx * dx + dy * dy);
         const perpX = -dy / length;
         const perpY = dx / length;
 
-        const vibrationX = Math.sin(p.frameCount * 0.3) * vibrationAmount;
-        const offsetX = perpX * vibrationX;
-        const offsetY = perpY * vibrationX;
+        // Draw as a bezier curve to simulate wave
+        const numSegments = 8;
+        const time = p.frameCount * 0.2;
 
         // Glow effect
-        p.stroke(matteColor[0], matteColor[1], matteColor[2], 120);
-        p.strokeWeight(stringThickness * 3);
-        p.line(
-            string.startX + offsetX, string.startY + offsetY,
-            string.endX + offsetX, string.endY + offsetY
-        );
+        p.stroke(matteColor[0], matteColor[1], matteColor[2], 80);
+        p.strokeWeight(stringThickness * 2.5);
+        p.noFill();
 
-        // Main vibrating string
+        p.beginShape();
+        for (let i = 0; i <= numSegments; i++) {
+            const t = i / numSegments;
+            const x = string.startX + dx * t;
+            const y = string.startY + dy * t;
+
+            // Wave oscillation: sin wave along the string length
+            const waveOffset = Math.sin(t * Math.PI * 3 + time) * vibrationAmount * Math.sin(t * Math.PI);
+            const offsetX = perpX * waveOffset;
+            const offsetY = perpY * waveOffset;
+
+            p.vertex(x + offsetX, y + offsetY);
+        }
+        p.endShape();
+
+        // Main vibrating string with wave
         p.stroke(matteColor[0], matteColor[1], matteColor[2], 255);
-        p.strokeWeight(stringThickness * 1.8);
-        p.line(
-            string.startX + offsetX, string.startY + offsetY,
-            string.endX + offsetX, string.endY + offsetY
-        );
+        p.strokeWeight(stringThickness * 0.7);
+        p.noFill();
+
+        p.beginShape();
+        for (let i = 0; i <= numSegments; i++) {
+            const t = i / numSegments;
+            const x = string.startX + dx * t;
+            const y = string.startY + dy * t;
+
+            const waveOffset = Math.sin(t * Math.PI * 3 + time) * vibrationAmount * Math.sin(t * Math.PI);
+            const offsetX = perpX * waveOffset;
+            const offsetY = perpY * waveOffset;
+
+            p.vertex(x + offsetX, y + offsetY);
+        }
+        p.endShape();
     } else {
         // Static string
         if (isSelected) {
             // Selected: black outline
             p.stroke(0, 0, 0);
-            p.strokeWeight(stringThickness * 1.6);
+            p.strokeWeight(stringThickness * 1.1);
             p.line(string.startX, string.startY, string.endX, string.endY);
 
             // Inner string with color
             p.stroke(matteColor[0], matteColor[1], matteColor[2], 255);
-            p.strokeWeight(stringThickness * 1.3);
+            p.strokeWeight(stringThickness * 0.8);
             p.line(string.startX, string.startY, string.endX, string.endY);
         } else {
-            // Normal string
+            // Normal string - thinner
             p.stroke(matteColor[0], matteColor[1], matteColor[2], 220);
-            p.strokeWeight(stringThickness);
+            p.strokeWeight(stringThickness * 0.6);
             p.line(string.startX, string.startY, string.endX, string.endY);
         }
     }
@@ -343,8 +362,8 @@ function drawStringInDrawMode(p, string, isSelected, isHovered) {
     drawEndpoint(p, string.startX, string.startY, string.isDraggingStart, true, materialColor, p.width, p.height, showCoords);
     drawEndpoint(p, string.endX, string.endY, string.isDraggingEnd, false, materialColor, p.width, p.height, showCoords);
 
-    // Draw string info overlay only when hovered, selected, or playing
-    if (isHovered || isSelected || string.isPlaying) {
+    // Draw string info overlay only when selected or playing (removed hover)
+    if (isSelected || string.isPlaying) {
         const midX = (string.startX + string.endX) / 2;
         const midY = (string.startY + string.endY) / 2;
 
@@ -575,13 +594,30 @@ function drawCapo(p, x, y, isDragging) {
  * @param {p5} p - p5.js instance
  * @param {string} mode - Current interaction mode
  * @param {number} numStrings - Number of strings
+ * @param {Array<HarpString>} strings - Array of all strings (optional, for draw mode)
  */
-function drawUIOverlay(p, mode, numStrings) {
+function drawUIOverlay(p, mode, numStrings, strings = null) {
     // String count at top right - black for readability
     p.fill(0, 0, 0);
     p.textAlign(p.RIGHT, p.TOP);
     p.textSize(VISUAL_CONSTANTS.FONT_SIZES.label);
-    p.text(numStrings + ' STRINGS', p.width - 15, 15);
+
+    // In draw mode, show count of placed strings
+    if (mode === INTERACTION_CONSTANTS.MODES.DRAW && strings) {
+        const placedCount = strings.filter(s => s.drawMode && s.startX !== null && s.endX !== null).length;
+        p.text(placedCount + ' / ' + numStrings + ' STRINGS', p.width - 15, 15);
+    } else {
+        p.text(numStrings + ' STRINGS', p.width - 15, 15);
+    }
+
+    // Surface dimensions at top left - bold
+    p.textAlign(p.LEFT, p.TOP);
+    p.textStyle(p.BOLD);
+    p.textSize(VISUAL_CONSTANTS.FONT_SIZES.label);
+    const widthFt = (PHYSICS_CONSTANTS.WALL_WIDTH / 304.8).toFixed(1);
+    const heightFt = (PHYSICS_CONSTANTS.FULL_STRING_LENGTH / 304.8).toFixed(1);
+    p.text(`${widthFt}' × ${heightFt}'`, 15, 15);
+    p.textStyle(p.NORMAL);
 
     // Note: Mode and material info now displayed in HTML overlay at bottom
     // Removed canvas text to avoid overlap
@@ -636,12 +672,12 @@ function drawKeyboardShortcuts(p, currentMode) {
         shortcuts = [
             '← → : SELECT STRING',
             'SHIFT+CLICK : PLACE STRING',
+            'CTRL+CLICK : MULTI-SELECT',
             'DRAG : MOVE ENDPOINT',
             'CLICK : PLUCK',
             'DEL : DELETE STRING',
             'SPACE : PLUCK',
-            '1-4 : MODE',
-            'T : TEST AUDIO'
+            '1-4 : MODE'
         ];
     } else {
         // Standard mode shortcuts - include capo controls

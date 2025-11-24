@@ -180,7 +180,7 @@ class WallHarpSimulator {
         p.pop();
 
         // Draw UI overlay (not affected by zoom/pan)
-        drawUIOverlay(p, this.interactionManager.mode, this.numStrings);
+        drawUIOverlay(p, this.interactionManager.mode, this.numStrings, this.strings);
 
         // Draw currently playing string info (not affected by zoom/pan)
         drawPlayingStringInfo(p, this.strings);

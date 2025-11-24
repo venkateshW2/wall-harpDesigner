@@ -113,8 +113,9 @@ class InteractionManager {
      * @param {number} mouseX - Mouse X
      * @param {number} mouseY - Mouse Y
      * @param {boolean} shiftKey - Whether Shift is pressed
+     * @param {boolean} ctrlKey - Whether Ctrl/Cmd is pressed (for multi-select)
      */
-    handleDrawModeMousePressed(mouseX, mouseY, shiftKey) {
+    handleDrawModeMousePressed(mouseX, mouseY, shiftKey, ctrlKey = false) {
         // Check if clicking on existing endpoint
         const endpoint = this.findEndpointAtPosition(mouseX, mouseY);
 
@@ -138,7 +139,7 @@ class InteractionManager {
         }
 
         // If Shift is held, place a new string
-        if (shiftKey) {
+        if (shiftKey && !ctrlKey) {
             const unplacedString = this.findUnplacedDrawString();
 
             if (unplacedString) {
@@ -162,19 +163,35 @@ class InteractionManager {
                 console.log('All strings placed in draw mode');
             }
         } else {
-            // Regular click without Shift: try to pluck a string
+            // Regular click or Ctrl+Click: try to select/pluck a string
             const string = this.findStringAtPosition(mouseX, mouseY);
 
             if (string) {
-                // Select and pluck this string
-                this.selectedStringIndex = string.index;
-                this.selectedStringIndices = [string.index];
-                this.updateSelection();
-
-                string.pluck();
-                console.log(`Plucked string #${string.index + 1}`);
+                // Ctrl+Click for multi-select
+                if (ctrlKey) {
+                    if (this.selectedStringIndices.includes(string.index)) {
+                        // Deselect if already selected
+                        this.selectedStringIndices = this.selectedStringIndices.filter(i => i !== string.index);
+                        if (this.selectedStringIndices.length > 0) {
+                            this.selectedStringIndex = this.selectedStringIndices[0];
+                        }
+                    } else {
+                        // Add to selection
+                        this.selectedStringIndices.push(string.index);
+                        this.selectedStringIndex = string.index;
+                    }
+                    this.updateSelection();
+                    console.log(`Multi-select: ${this.selectedStringIndices.length} strings selected`);
+                } else {
+                    // Regular click: select and pluck this string only
+                    this.selectedStringIndex = string.index;
+                    this.selectedStringIndices = [string.index];
+                    this.updateSelection();
+                    string.pluck();
+                    console.log(`Plucked string #${string.index + 1}`);
+                }
             } else {
-                console.log('Click on a string to pluck it, or Shift+Click to place a new string');
+                console.log('Click on a string to pluck it, Shift+Click to place a new string, or Ctrl+Click for multi-select');
             }
         }
     }
@@ -258,7 +275,7 @@ class InteractionManager {
     handleMousePressed(mouseX, mouseY, isMultiSelect = false, shiftKey = false) {
         // Route to draw mode handler if in draw mode
         if (this.mode === INTERACTION_CONSTANTS.MODES.DRAW) {
-            this.handleDrawModeMousePressed(mouseX, mouseY, shiftKey);
+            this.handleDrawModeMousePressed(mouseX, mouseY, shiftKey, isMultiSelect);
             return;
         }
 

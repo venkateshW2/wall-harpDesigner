@@ -284,9 +284,12 @@
                 <section class="sidebar-section collapsed" id="drawModeControls">
                     <h2 class="section-title">DRAW MODE TOOLS</h2>
                     <div class="section-content">
-                        <button id="quantizePitch" class="btn btn-primary">QUANTIZE TO PERFECT PITCH</button>
+                        <div class="button-group">
+                            <button id="quantizePitch" class="btn btn-primary">QUANTIZE TO PERFECT PITCH</button>
+                            <button id="clearAllStrings" class="btn btn-secondary">CLEAR ALL STRINGS</button>
+                        </div>
                         <div class="control-hint" style="margin-bottom: 15px;">
-                            Snap selected string(s) to nearest perfect musical pitch
+                            Quantize: Snap to perfect pitch | Clear: Remove all drawn strings
                         </div>
 
                         <div class="control-row">

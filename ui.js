@@ -217,6 +217,31 @@ function initializeUIControls(app) {
         });
     }
 
+    // Clear All Strings button
+    const clearAllStringsBtn = document.getElementById('clearAllStrings');
+    if (clearAllStringsBtn) {
+        clearAllStringsBtn.addEventListener('click', () => {
+            // Clear all draw mode strings
+            let clearedCount = 0;
+            app.strings.forEach(string => {
+                if (string.drawMode && (string.startX !== null || string.endX !== null)) {
+                    string.startX = null;
+                    string.startY = null;
+                    string.endX = null;
+                    string.endY = null;
+                    clearedCount++;
+                }
+            });
+
+            if (clearedCount > 0) {
+                showNotification(`Cleared ${clearedCount} string(s)`, 'success');
+                app.redraw();
+            } else {
+                showNotification('No strings to clear', 'warning');
+            }
+        });
+    }
+
     // Scale preset buttons (both old and new class names)
     const presetButtons = document.querySelectorAll('.preset-btn, .preset-item');
     presetButtons.forEach(btn => {
