@@ -33,6 +33,15 @@ class HarpString {
         this.isSelected = false;
         this.isDraggingLowerCapo = false;
         this.isDraggingUpperCapo = false;
+
+        // Draw mode properties (2D free-form positioning)
+        this.drawMode = false;           // Is this string in draw mode?
+        this.startX = null;              // Start point X (pixels)
+        this.startY = null;              // Start point Y (pixels)
+        this.endX = null;                // End point X (pixels)
+        this.endY = null;                // End point Y (pixels)
+        this.isDraggingStart = false;    // Is user dragging start point?
+        this.isDraggingEnd = false;      // Is user dragging end point?
     }
 
     calculateLengthFromFrequency(frequency) {
@@ -96,7 +105,14 @@ class HarpString {
     }
 
     updateCalculations() {
-        this.playableLengthMm = this.upperCapoMm - this.lowerCapoMm;
+        // If in draw mode, calculate length from 2D endpoints
+        if (this.drawMode && this.startX !== null && this.endX !== null) {
+            this.playableLengthMm = this.calculateDrawLength();
+        } else {
+            // Normal vertical mode
+            this.playableLengthMm = this.upperCapoMm - this.lowerCapoMm;
+        }
+
         this.actualFrequency = this.calculateFrequencyFromLength(this.playableLengthMm);
         this.actualMidiNote = frequencyToMidi(this.actualFrequency);
         this.noteName = midiToNoteName(this.actualMidiNote);
@@ -105,6 +121,82 @@ class HarpString {
         this.playableLengthFeet = this.playableLengthMm / 304.8;
         this.lowerCapoFeet = this.lowerCapoMm / 304.8;
         this.upperCapoFeet = this.upperCapoMm / 304.8;
+    }
+
+    /**
+     * Calculate string length from 2D endpoints (in draw mode)
+     * Converts pixel distance to mm based on canvas height
+     * @param {number} canvasHeight - Canvas height in pixels (optional, uses default if not provided)
+     * @returns {number} - Length in mm
+     */
+    calculateDrawLength(canvasHeight) {
+        if (!this.drawMode || this.startX === null || this.endX === null) {
+            return this.playableLengthMm;
+        }
+
+        // Get Euclidean distance in pixels
+        const dx = this.endX - this.startX;
+        const dy = this.endY - this.startY;
+        const pixelLength = Math.sqrt(dx * dx + dy * dy);
+
+        // Convert to mm (scale based on canvas height representing full string length)
+        // Assuming canvas height corresponds to FULL_STRING_LENGTH
+        const heightReference = canvasHeight || VISUAL_CONSTANTS.CANVAS_HEIGHT;
+        let lengthMm = pixelLength * (PHYSICS_CONSTANTS.FULL_STRING_LENGTH / heightReference);
+
+        // Clamp to minimum playable length to avoid infinity frequency
+        lengthMm = Math.max(lengthMm, PHYSICS_CONSTANTS.MIN_PLAYABLE_LENGTH);
+
+        return lengthMm;
+    }
+
+    /**
+     * Enable draw mode for this string
+     * @param {number} startX - Starting X position in pixels
+     * @param {number} startY - Starting Y position in pixels
+     * @param {number} endX - Ending X position in pixels
+     * @param {number} endY - Ending Y position in pixels
+     */
+    enableDrawMode(startX, startY, endX, endY) {
+        this.drawMode = true;
+        this.startX = startX;
+        this.startY = startY;
+        this.endX = endX;
+        this.endY = endY;
+        this.updateCalculations();
+        console.log(`String #${this.index + 1} enabled draw mode: (${startX},${startY}) → (${endX},${endY})`);
+    }
+
+    /**
+     * Disable draw mode and revert to vertical mode
+     */
+    disableDrawMode() {
+        this.drawMode = false;
+        this.startX = null;
+        this.startY = null;
+        this.endX = null;
+        this.endY = null;
+        this.isDraggingStart = false;
+        this.isDraggingEnd = false;
+        this.initializeCapoPositions();
+        console.log(`String #${this.index + 1} disabled draw mode`);
+    }
+
+    /**
+     * Set draw mode endpoint positions
+     * @param {number} startX - Start X
+     * @param {number} startY - Start Y
+     * @param {number} endX - End X
+     * @param {number} endY - End Y
+     */
+    setDrawEndpoints(startX, startY, endX, endY) {
+        if (!this.drawMode) return;
+
+        this.startX = startX;
+        this.startY = startY;
+        this.endX = endX;
+        this.endY = endY;
+        this.updateCalculations();
     }
 
     setLowerCapoPosition(positionMm) {

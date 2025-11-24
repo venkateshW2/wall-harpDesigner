@@ -272,17 +272,74 @@
                             <button class="mode-btn active" data-mode="pluck">[PLUCK]</button>
                             <button class="mode-btn" data-mode="adjust">[ADJUST]</button>
                             <button class="mode-btn" data-mode="pattern">[PATTERN]</button>
+                            <button class="mode-btn" data-mode="draw">[DRAW]</button>
                         </div>
                         <div class="control-hint">
-                            PLUCK: Click to hear • ADJUST: Drag capos • PATTERN: Apply waveforms
+                            PLUCK: Click to hear • ADJUST: Drag capos • PATTERN: Apply waveforms • DRAW: Free-form strings
+                        </div>
+                    </div>
+                </section>
+
+                <!-- DRAW MODE CONTROLS -->
+                <section class="sidebar-section collapsed" id="drawModeControls">
+                    <h2 class="section-title">DRAW MODE TOOLS</h2>
+                    <div class="section-content">
+                        <button id="quantizePitch" class="btn btn-primary">QUANTIZE TO PERFECT PITCH</button>
+                        <div class="control-hint" style="margin-bottom: 15px;">
+                            Snap selected string(s) to nearest perfect musical pitch
+                        </div>
+
+                        <div class="control-row">
+                            <label class="control-label">SCALE FILTER</label>
+                        </div>
+                        <select id="drawScaleFilter" class="select-field">
+                            <option value="none">NO FILTER (ALL PITCHES)</option>
+                            <option value="chromatic">CHROMATIC</option>
+                            <option value="major">MAJOR</option>
+                            <option value="minor">MINOR</option>
+                            <option value="pentatonicMajor">PENTATONIC MAJOR</option>
+                            <option value="pentatonicMinor">PENTATONIC MINOR</option>
+                            <option value="blues">BLUES</option>
+                            <option value="wholeTone">WHOLE TONE</option>
+                            <option value="harmonicMinor">HARMONIC MINOR</option>
+                            <option value="dorian">DORIAN MODE</option>
+                            <option value="lydian">LYDIAN MODE</option>
+                            <option value="mixolydian">MIXOLYDIAN MODE</option>
+                            <option value="harmonicSeries">HARMONIC SERIES</option>
+                        </select>
+
+                        <div class="control-row">
+                            <label class="control-label">ROOT NOTE</label>
+                        </div>
+                        <select id="drawRootNote" class="select-field">
+                            <option value="36">C2 (MIDI 36)</option>
+                            <option value="37">C#2 (MIDI 37)</option>
+                            <option value="38">D2 (MIDI 38)</option>
+                            <option value="39">D#2 (MIDI 39)</option>
+                            <option value="40">E2 (MIDI 40)</option>
+                            <option value="41">F2 (MIDI 41)</option>
+                            <option value="42">F#2 (MIDI 42)</option>
+                            <option value="43">G2 (MIDI 43)</option>
+                            <option value="44">G#2 (MIDI 44)</option>
+                            <option value="45">A2 (MIDI 45)</option>
+                            <option value="46">A#2 (MIDI 46)</option>
+                            <option value="47">B2 (MIDI 47)</option>
+                            <option value="48">C3 (MIDI 48)</option>
+                        </select>
+
+                        <div class="control-hint">
+                            Scale filter constrains quantization to selected scale notes only
                         </div>
                     </div>
                 </section>
 
                 <!-- DIRECT TUNING -->
                 <section class="sidebar-section collapsed">
-                    <h2 class="section-title">DIRECT TUNING</h2>
+                    <h2 class="section-title">DIRECT TUNING (VERTICAL/CAPO MODE ONLY)</h2>
                     <div class="section-content">
+                        <div class="control-hint" style="margin-bottom: 12px; color: #666;">
+                            ⚠ Direct tuning adjusts capo positions. Not applicable in DRAW mode.
+                        </div>
                         <input type="text" id="noteInput" class="text-field" placeholder="C4 / 261.63 Hz">
                         <button id="applyNote" class="btn btn-secondary">APPLY TO SELECTED</button>
                         <div class="button-group">

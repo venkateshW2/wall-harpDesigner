@@ -164,6 +164,8 @@ function initializeUIControls(app) {
 
     // Mode buttons
     const modeButtons = document.querySelectorAll('.mode-btn');
+    const drawModeControls = document.getElementById('drawModeControls');
+
     modeButtons.forEach(btn => {
         btn.addEventListener('click', (e) => {
             const mode = e.target.dataset.mode;
@@ -172,8 +174,48 @@ function initializeUIControls(app) {
             // Update button states
             modeButtons.forEach(b => b.classList.remove('active'));
             e.target.classList.add('active');
+
+            // Show/hide draw mode controls
+            if (drawModeControls) {
+                if (mode === 'draw') {
+                    drawModeControls.classList.remove('collapsed');
+                } else {
+                    drawModeControls.classList.add('collapsed');
+                }
+            }
         });
     });
+
+    // Quantize Pitch button
+    const quantizePitchBtn = document.getElementById('quantizePitch');
+    if (quantizePitchBtn) {
+        quantizePitchBtn.addEventListener('click', () => {
+            const scaleFilter = document.getElementById('drawScaleFilter')?.value || 'none';
+            const rootNote = parseInt(document.getElementById('drawRootNote')?.value || '48');
+
+            // Get selected strings
+            const selectedStrings = app.interactionManager.getSelectedStrings();
+
+            if (selectedStrings.length === 0) {
+                showNotification('No strings selected for quantization', 'warning');
+                return;
+            }
+
+            let quantizedCount = 0;
+            selectedStrings.forEach(string => {
+                if (quantizeStringPitch(string, scaleFilter, rootNote)) {
+                    quantizedCount++;
+                }
+            });
+
+            if (quantizedCount > 0) {
+                showNotification(`Quantized ${quantizedCount} string(s) to perfect pitch`, 'success');
+                app.redraw();
+            } else {
+                showNotification('No strings could be quantized', 'warning');
+            }
+        });
+    }
 
     // Scale preset buttons (both old and new class names)
     const presetButtons = document.querySelectorAll('.preset-btn, .preset-item');

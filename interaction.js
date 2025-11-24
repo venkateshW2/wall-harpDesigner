@@ -29,6 +29,222 @@ class InteractionManager {
 
         // For auto-pluck while dragging
         this.lastDragPluckTime = 0;
+
+        // Draw mode state
+        this.drawModeState = {
+            placingString: false,      // Is user placing a new string?
+            currentStringIndex: -1,    // Which string is being placed?
+            placedStartPoint: false,   // Has start point been placed?
+            tempEndX: null,            // Temporary end point while placing
+            tempEndY: null
+        };
+    }
+
+    /**
+     * Find endpoint under cursor in draw mode
+     * @param {number} mouseX - Mouse X
+     * @param {number} mouseY - Mouse Y
+     * @returns {object|null} - {string, endpoint: 'start'|'end'} or null
+     */
+    findEndpointAtPosition(mouseX, mouseY) {
+        const threshold = INTERACTION_CONSTANTS.ENDPOINT_GRAB_THRESHOLD;
+
+        for (let string of this.strings) {
+            if (!string.drawMode) continue;
+            if (string.startX === null || string.endX === null) continue;
+
+            // Check start point
+            if (isNearPoint(mouseX, mouseY, string.startX, string.startY, threshold)) {
+                return { string, endpoint: 'start' };
+            }
+
+            // Check end point
+            if (isNearPoint(mouseX, mouseY, string.endX, string.endY, threshold)) {
+                return { string, endpoint: 'end' };
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Find first unplaced string in draw mode
+     * @returns {HarpString|null}
+     */
+    findUnplacedDrawString() {
+        for (let string of this.strings) {
+            if (string.drawMode && (string.startX === null || string.endX === null)) {
+                return string;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Find string near click position in draw mode
+     * @param {number} mouseX - Mouse X
+     * @param {number} mouseY - Mouse Y
+     * @returns {HarpString|null}
+     */
+    findStringAtPosition(mouseX, mouseY) {
+        const threshold = 15; // pixels
+
+        for (let string of this.strings) {
+            if (!string.drawMode) continue;
+            if (string.startX === null || string.endX === null) continue;
+
+            // Calculate distance from point to line segment
+            const dist = distanceToLineSegment(
+                mouseX, mouseY,
+                string.startX, string.startY,
+                string.endX, string.endY
+            );
+
+            if (dist < threshold) {
+                return string;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Handle mouse press in DRAW mode
+     * @param {number} mouseX - Mouse X
+     * @param {number} mouseY - Mouse Y
+     * @param {boolean} shiftKey - Whether Shift is pressed
+     */
+    handleDrawModeMousePressed(mouseX, mouseY, shiftKey) {
+        // Check if clicking on existing endpoint
+        const endpoint = this.findEndpointAtPosition(mouseX, mouseY);
+
+        if (endpoint) {
+            // Start dragging this endpoint
+            const { string, endpoint: which } = endpoint;
+            this.draggedString = string;
+
+            if (which === 'start') {
+                string.isDraggingStart = true;
+            } else {
+                string.isDraggingEnd = true;
+            }
+
+            this.selectedStringIndex = string.index;
+            this.selectedStringIndices = [string.index];
+            this.updateSelection();
+
+            console.log(`Grabbed ${which} endpoint of string #${string.index + 1}`);
+            return;
+        }
+
+        // If Shift is held, place a new string
+        if (shiftKey) {
+            const unplacedString = this.findUnplacedDrawString();
+
+            if (unplacedString) {
+                // Start placing this string
+                this.drawModeState.placingString = true;
+                this.drawModeState.currentStringIndex = unplacedString.index;
+                this.drawModeState.placedStartPoint = true;
+
+                // Set start point
+                unplacedString.startX = mouseX;
+                unplacedString.startY = mouseY;
+                unplacedString.endX = mouseX;
+                unplacedString.endY = mouseY;
+
+                this.selectedStringIndex = unplacedString.index;
+                this.selectedStringIndices = [unplacedString.index];
+                this.updateSelection();
+
+                console.log(`Placing string #${unplacedString.index + 1} - start point set (Shift+Click)`);
+            } else {
+                console.log('All strings placed in draw mode');
+            }
+        } else {
+            // Regular click without Shift: try to pluck a string
+            const string = this.findStringAtPosition(mouseX, mouseY);
+
+            if (string) {
+                // Select and pluck this string
+                this.selectedStringIndex = string.index;
+                this.selectedStringIndices = [string.index];
+                this.updateSelection();
+
+                string.pluck();
+                console.log(`Plucked string #${string.index + 1}`);
+            } else {
+                console.log('Click on a string to pluck it, or Shift+Click to place a new string');
+            }
+        }
+    }
+
+    /**
+     * Handle mouse drag in DRAW mode
+     * @param {number} mouseX - Mouse X
+     * @param {number} mouseY - Mouse Y
+     */
+    handleDrawModeMouseDragged(mouseX, mouseY) {
+        // If placing a new string
+        if (this.drawModeState.placingString) {
+            const string = this.strings[this.drawModeState.currentStringIndex];
+            if (string) {
+                // Update end point
+                string.endX = mouseX;
+                string.endY = mouseY;
+                string.updateCalculations();
+            }
+            return;
+        }
+
+        // If dragging an existing endpoint
+        if (this.draggedString) {
+            if (this.draggedString.isDraggingStart) {
+                this.draggedString.startX = mouseX;
+                this.draggedString.startY = mouseY;
+            } else if (this.draggedString.isDraggingEnd) {
+                this.draggedString.endX = mouseX;
+                this.draggedString.endY = mouseY;
+            }
+
+            this.draggedString.updateCalculations();
+
+            // Auto-pluck while dragging for live feedback
+            const now = Date.now();
+            if (now - this.lastDragPluckTime > INTERACTION_CONSTANTS.DRAG_PLUCK_INTERVAL) {
+                this.draggedString.pluck(0.5, 0.4);
+                this.lastDragPluckTime = now;
+            }
+        }
+    }
+
+    /**
+     * Handle mouse release in DRAW mode
+     */
+    handleDrawModeMouseReleased() {
+        // If placing a string, finalize it
+        if (this.drawModeState.placingString) {
+            const string = this.strings[this.drawModeState.currentStringIndex];
+            if (string) {
+                string.updateCalculations();
+                console.log(`String #${string.index + 1} placed: (${string.startX.toFixed(0)},${string.startY.toFixed(0)}) → (${string.endX.toFixed(0)},${string.endY.toFixed(0)})`);
+
+                // Play the string to hear it
+                string.pluck(1.0, 0.6);
+            }
+
+            // Reset placing state
+            this.drawModeState.placingString = false;
+            this.drawModeState.currentStringIndex = -1;
+            this.drawModeState.placedStartPoint = false;
+        }
+
+        // If dragging an endpoint, release it
+        if (this.draggedString) {
+            this.draggedString.isDraggingStart = false;
+            this.draggedString.isDraggingEnd = false;
+            this.draggedString = null;
+        }
     }
 
     /**
@@ -37,8 +253,16 @@ class InteractionManager {
      * @param {number} mouseX - Mouse X coordinate
      * @param {number} mouseY - Mouse Y coordinate
      * @param {boolean} isMultiSelect - Whether Ctrl/Cmd is pressed for multi-selection
+     * @param {boolean} shiftKey - Whether Shift is pressed
      */
-    handleMousePressed(mouseX, mouseY, isMultiSelect = false) {
+    handleMousePressed(mouseX, mouseY, isMultiSelect = false, shiftKey = false) {
+        // Route to draw mode handler if in draw mode
+        if (this.mode === INTERACTION_CONSTANTS.MODES.DRAW) {
+            this.handleDrawModeMousePressed(mouseX, mouseY, shiftKey);
+            return;
+        }
+
+        // Original code for other modes (UNCHANGED)
         // Find string under cursor
         const stringIndex = this.findStringAtX(mouseX);
         if (stringIndex === -1) return;
@@ -111,6 +335,12 @@ class InteractionManager {
      * @param {number} mouseY - Mouse Y coordinate
      */
     handleMouseDragged(mouseX, mouseY) {
+        // Route to draw mode handler if in draw mode
+        if (this.mode === INTERACTION_CONSTANTS.MODES.DRAW) {
+            this.handleDrawModeMouseDragged(mouseX, mouseY);
+            return;
+        }
+
         if (!this.draggedString || this.mode !== INTERACTION_CONSTANTS.MODES.ADJUST) return;
 
         const newPositionMm = screenYToMm(mouseY, this.canvasHeight);
@@ -133,6 +363,12 @@ class InteractionManager {
      * Handle mouse release event
      */
     handleMouseReleased() {
+        // Route to draw mode handler if in draw mode
+        if (this.mode === INTERACTION_CONSTANTS.MODES.DRAW) {
+            this.handleDrawModeMouseReleased();
+            return;
+        }
+
         if (this.draggedString) {
             this.draggedString.isDraggingLowerCapo = false;
             this.draggedString.isDraggingUpperCapo = false;
@@ -241,19 +477,58 @@ class InteractionManager {
         if (key === '1') this.setMode(INTERACTION_CONSTANTS.MODES.PLUCK);
         if (key === '2') this.setMode(INTERACTION_CONSTANTS.MODES.ADJUST);
         if (key === '3') this.setMode(INTERACTION_CONSTANTS.MODES.PATTERN);
+        if (key === '4') this.setMode(INTERACTION_CONSTANTS.MODES.DRAW);
 
         // Arrow Left/Right: Navigate between strings
-        if (key === 'ArrowLeft' && this.selectedStringIndex > 0) {
-            this.selectedStringIndex--;
-            this.updateSelection();
-            selected = this.getSelectedString(); // Get newly selected string
-            if (selected) selected.pluck(0.5, 0.3);
+        if (key === 'ArrowLeft') {
+            if (this.mode === INTERACTION_CONSTANTS.MODES.DRAW) {
+                // In draw mode, only navigate through placed strings
+                let newIndex = this.selectedStringIndex - 1;
+                while (newIndex >= 0) {
+                    const str = this.strings[newIndex];
+                    if (str.drawMode && str.startX !== null && str.endX !== null) {
+                        this.selectedStringIndex = newIndex;
+                        this.updateSelection();
+                        selected = this.getSelectedString();
+                        if (selected) selected.pluck(0.5, 0.3);
+                        break;
+                    }
+                    newIndex--;
+                }
+            } else {
+                // In other modes, navigate normally
+                if (this.selectedStringIndex > 0) {
+                    this.selectedStringIndex--;
+                    this.updateSelection();
+                    selected = this.getSelectedString();
+                    if (selected) selected.pluck(0.5, 0.3);
+                }
+            }
         }
-        if (key === 'ArrowRight' && this.selectedStringIndex < this.strings.length - 1) {
-            this.selectedStringIndex++;
-            this.updateSelection();
-            selected = this.getSelectedString(); // Get newly selected string
-            if (selected) selected.pluck(0.5, 0.3);
+        if (key === 'ArrowRight') {
+            if (this.mode === INTERACTION_CONSTANTS.MODES.DRAW) {
+                // In draw mode, only navigate through placed strings
+                let newIndex = this.selectedStringIndex + 1;
+                while (newIndex < this.strings.length) {
+                    const str = this.strings[newIndex];
+                    if (str.drawMode && str.startX !== null && str.endX !== null) {
+                        this.selectedStringIndex = newIndex;
+                        this.updateSelection();
+                        selected = this.getSelectedString();
+                        if (selected) selected.pluck(0.5, 0.3);
+                        break;
+                    }
+                    newIndex++;
+                }
+            } else {
+                // In other modes, navigate normally
+                if (this.selectedStringIndex < this.strings.length - 1) {
+                    this.selectedStringIndex++;
+                    this.updateSelection();
+                    selected = this.getSelectedString();
+                    if (selected) selected.pluck(0.5, 0.3);
+                }
+            }
         }
 
         // Shift + Up/Down: Switch active capo
@@ -311,6 +586,21 @@ class InteractionManager {
         // Space to pluck selected string
         if (key === ' ') {
             if (selected) selected.pluck();
+        }
+
+        // Delete/Backspace to delete string in draw mode
+        if ((key === 'Delete' || key === 'Backspace') && this.mode === INTERACTION_CONSTANTS.MODES.DRAW) {
+            const selectedStrings = this.getSelectedStrings();
+            selectedStrings.forEach(string => {
+                if (string.drawMode) {
+                    // Reset string endpoints to "delete" it
+                    string.startX = null;
+                    string.startY = null;
+                    string.endX = null;
+                    string.endY = null;
+                    console.log(`Deleted string #${string.index + 1}`);
+                }
+            });
         }
 
         // 'T' to test audio

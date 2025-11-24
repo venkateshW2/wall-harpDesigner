@@ -174,7 +174,7 @@ class WallHarpSimulator {
                 drawStringHighlight(p, string);
             }
 
-            drawString(p, string, string.isSelected);
+            drawString(p, string, string.isSelected, this.interactionManager.mode, isHovered);
         });
 
         p.pop();
@@ -186,7 +186,7 @@ class WallHarpSimulator {
         drawPlayingStringInfo(p, this.strings);
 
         // Draw keyboard shortcuts (not affected by zoom/pan)
-        drawKeyboardShortcuts(p);
+        drawKeyboardShortcuts(p, this.interactionManager.mode);
 
         // Draw string spacing labels (not affected by zoom/pan)
         drawStringSpacing(p, this.numStrings);
@@ -200,8 +200,11 @@ class WallHarpSimulator {
     }
 
     handleMousePressed(p) {
-        // Check if middle mouse or shift+click for panning
-        if (p.mouseButton === p.CENTER || p.keyIsDown(p.SHIFT)) {
+        // Check for Shift key
+        const shiftKey = p.keyIsDown(p.SHIFT);
+
+        // Check if middle mouse for panning (but NOT shift+click anymore, since Shift is used for placing strings in draw mode)
+        if (p.mouseButton === p.CENTER) {
             this.isPanning = true;
             this.lastMouseX = p.mouseX;
             this.lastMouseY = p.mouseY;
@@ -215,7 +218,7 @@ class WallHarpSimulator {
         // Check for Ctrl/Cmd key for multi-selection
         const isMultiSelect = p.keyIsDown(p.CONTROL) || p.keyIsDown(93); // 93 is Cmd on Mac
 
-        this.interactionManager.handleMousePressed(transformedX, transformedY, isMultiSelect);
+        this.interactionManager.handleMousePressed(transformedX, transformedY, isMultiSelect, shiftKey);
         this.selectedStringIndex = this.interactionManager.selectedStringIndex;
         this.updateUI();
     }
@@ -297,6 +300,15 @@ class WallHarpSimulator {
         console.log("Current WALL_WIDTH:", PHYSICS_CONSTANTS.WALL_WIDTH);
         console.log("Current FULL_STRING_LENGTH:", PHYSICS_CONSTANTS.FULL_STRING_LENGTH);
 
+        // Save draw mode string data before recreating (up to the new count)
+        const drawModeData = this.strings.slice(0, count).map(string => ({
+            drawMode: string.drawMode,
+            startX: string.startX,
+            startY: string.startY,
+            endX: string.endX,
+            endY: string.endY
+        }));
+
         this.numStrings = count;
         this.strings = createChromaticStrings(
             count,
@@ -304,6 +316,20 @@ class WallHarpSimulator {
             this.currentGauge,
             this.currentTension
         );
+
+        // Restore draw mode string data for existing strings
+        this.strings.forEach((string, index) => {
+            if (drawModeData[index] && drawModeData[index].drawMode) {
+                string.drawMode = drawModeData[index].drawMode;
+                string.startX = drawModeData[index].startX;
+                string.startY = drawModeData[index].startY;
+                string.endX = drawModeData[index].endX;
+                string.endY = drawModeData[index].endY;
+                // Recalculate with current dimensions
+                string.updateCalculations();
+            }
+        });
+
         this.interactionManager.strings = this.strings;
 
         // Reset selection to first string and update selection state
@@ -319,6 +345,7 @@ class WallHarpSimulator {
 
         console.log("✓ Strings created. First string totalStrings:", this.strings[0].totalStrings);
         console.log("✓ Selection updated. Selected indices:", this.interactionManager.selectedStringIndices);
+        console.log("✓ Preserved draw mode strings where possible");
 
         this.updateUI();
     }
@@ -326,6 +353,43 @@ class WallHarpSimulator {
     setMode(mode) {
         this.interactionManager.setMode(mode);
         updateModeIndicator(mode);
+
+        // Check if any strings are in draw mode
+        const hasDrawModeStrings = this.strings.some(s => s.drawMode && s.startX !== null);
+
+        // If switching TO draw mode AND no strings are in draw mode yet, enable it
+        if (mode === INTERACTION_CONSTANTS.MODES.DRAW && !hasDrawModeStrings) {
+            this.enableDrawModeForStrings();
+        }
+
+        // NOTE: We NO LONGER disable draw mode when switching away!
+        // This allows users to keep their drawn strings and switch between modes
+        // The draw mode strings will simply not be visible in vertical modes
+    }
+
+    /**
+     * Enable draw mode for all strings
+     */
+    enableDrawModeForStrings() {
+        console.log("=== ENABLING DRAW MODE ===");
+        this.strings.forEach(string => {
+            string.drawMode = true;
+            // Leave endpoints null - user will place them
+        });
+        console.log(`✓ ${this.strings.length} strings ready for drawing`);
+        showNotification('DRAW MODE: Click to pluck | Shift+Click to place string | Delete to remove | Drag endpoints to move', 'info', 8000);
+    }
+
+    /**
+     * Disable draw mode for all strings and revert to vertical mode
+     */
+    disableDrawModeForStrings() {
+        console.log("=== DISABLING DRAW MODE ===");
+        this.strings.forEach(string => {
+            string.disableDrawMode();
+        });
+        console.log(`✓ Reverted to vertical string mode`);
+        showNotification('Reverted to vertical string mode', 'info');
     }
 
     applyScalePreset(scaleName, rootMidi) {
@@ -444,6 +508,15 @@ class WallHarpSimulator {
         } else {
             console.log(`Recreating ${this.numStrings} strings with new dimensions...`);
 
+            // Save draw mode string data before recreating
+            const drawModeData = this.strings.map(string => ({
+                drawMode: string.drawMode,
+                startX: string.startX,
+                startY: string.startY,
+                endX: string.endX,
+                endY: string.endY
+            }));
+
             // Recreate strings with new dimensions
             this.strings = createChromaticStrings(
                 this.numStrings,
@@ -451,9 +524,24 @@ class WallHarpSimulator {
                 this.currentGauge,
                 this.currentTension
             );
+
+            // Restore draw mode string data
+            this.strings.forEach((string, index) => {
+                if (drawModeData[index] && drawModeData[index].drawMode) {
+                    string.drawMode = drawModeData[index].drawMode;
+                    string.startX = drawModeData[index].startX;
+                    string.startY = drawModeData[index].startY;
+                    string.endX = drawModeData[index].endX;
+                    string.endY = drawModeData[index].endY;
+                    // Recalculate with new wall dimensions
+                    string.updateCalculations();
+                }
+            });
+
             this.interactionManager.strings = this.strings;
 
             console.log(`✓ Created strings. First string: lowerCapo=${this.strings[0].lowerCapoMm}mm, upperCapo=${this.strings[0].upperCapoMm}mm`);
+            console.log(`✓ Preserved draw mode strings`);
 
             // Reset selection to first string and update selection state
             this.selectedStringIndex = 0;

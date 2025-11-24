@@ -6,6 +6,39 @@
 // ===== COORDINATE CONVERSION FUNCTIONS =====
 
 /**
+ * Convert pixel coordinates to wall position in feet and inches
+ * @param {number} pixelX - X position in pixels
+ * @param {number} pixelY - Y position in pixels
+ * @param {number} canvasWidth - Canvas width
+ * @param {number} canvasHeight - Canvas height
+ * @returns {object} - {x: "feet'inches\"", y: "feet'inches\"", xScale: "inches\""}
+ */
+function pixelsToWallPosition(pixelX, pixelY, canvasWidth, canvasHeight) {
+    // Convert pixels to mm
+    const wallWidthMm = PHYSICS_CONSTANTS.WALL_WIDTH;
+    const wallHeightMm = PHYSICS_CONSTANTS.FULL_STRING_LENGTH;
+
+    const xMm = (pixelX / canvasWidth) * wallWidthMm;
+    const yMm = (pixelY / canvasHeight) * wallHeightMm;
+
+    // Convert mm to inches (1 inch = 25.4mm)
+    const xInches = xMm / 25.4;
+    const yInches = yMm / 25.4;
+
+    // Convert to feet and inches
+    const xFeet = Math.floor(xInches / 12);
+    const xInchesRemainder = (xInches % 12).toFixed(1);
+    const yFeet = Math.floor(yInches / 12);
+    const yInchesRemainder = (yInches % 12).toFixed(1);
+
+    return {
+        x: `${xFeet}'${xInchesRemainder}"`,
+        y: `${yFeet}'${yInchesRemainder}"`,
+        xScale: `${xInches.toFixed(1)}"`  // X-scale in inches from left edge
+    };
+}
+
+/**
  * Convert mm position to screen Y coordinate
  * Note: Screen Y goes down, but string measurements go up from soundbox
  *
@@ -158,13 +191,243 @@ function drawMeasurementRuler(p) {
 }
 
 /**
+ * Check if point is near another point
+ * @param {number} px - Point X
+ * @param {number} py - Point Y
+ * @param {number} ex - Endpoint X
+ * @param {number} ey - Endpoint Y
+ * @param {number} threshold - Distance threshold
+ * @returns {boolean}
+ */
+function isNearPoint(px, py, ex, ey, threshold = 20) {
+    const dist = Math.sqrt((px - ex) ** 2 + (py - ey) ** 2);
+    return dist < threshold;
+}
+
+/**
+ * Draw endpoint marker (capo equivalent in draw mode)
+ * @param {p5} p - p5.js instance
+ * @param {number} x - X position
+ * @param {number} y - Y position
+ * @param {boolean} isDragging - Is this endpoint being dragged?
+ * @param {boolean} isStart - Is this the start point (vs end point)?
+ * @param {Array} color - RGB color array for the string
+ * @param {number} canvasWidth - Canvas width for coordinate conversion
+ * @param {number} canvasHeight - Canvas height for coordinate conversion
+ * @param {boolean} showCoordinates - Whether to show position coordinates
+ */
+function drawEndpoint(p, x, y, isDragging, isStart, color, canvasWidth, canvasHeight, showCoordinates = false) {
+    const size = isDragging ? 16 : 12;
+
+    // Outer circle (based on string color)
+    p.fill(color[0], color[1], color[2], 200);
+    p.stroke(VISUAL_CONSTANTS.COLORS.capoStroke);
+    p.strokeWeight(2);
+    p.circle(x, y, size);
+
+    // Inner indicator (different for start vs end)
+    if (isStart) {
+        // Start point: filled circle
+        p.fill(VISUAL_CONSTANTS.COLORS.capo);
+        p.noStroke();
+        p.circle(x, y, size / 2);
+    } else {
+        // End point: hollow circle
+        p.noFill();
+        p.stroke(VISUAL_CONSTANTS.COLORS.capo);
+        p.strokeWeight(2);
+        p.circle(x, y, size / 2);
+    }
+
+    // Draw position coordinates only when interacting (dragging, hovering, or selected)
+    if (showCoordinates) {
+        const pos = pixelsToWallPosition(x, y, canvasWidth, canvasHeight);
+        const labelText = `X:${pos.xScale} Y:${pos.y}`;
+
+        // Position label offset based on endpoint position
+        const offsetX = x > canvasWidth / 2 ? -5 : 5;
+        const offsetY = y > canvasHeight / 2 ? -10 : 15;
+
+        // Draw text without background - bold black text
+        p.textSize(10);
+        p.textAlign(offsetX < 0 ? p.RIGHT : p.LEFT, p.CENTER);
+        p.fill(0, 0, 0);  // Black text
+        p.noStroke();
+        p.textStyle(p.BOLD);
+        p.text(labelText, x + offsetX + (offsetX < 0 ? -4 : 4), y + offsetY);
+        p.textStyle(p.NORMAL);
+    }
+}
+
+/**
+ * Draw a string in draw mode (free-form line)
+ * @param {p5} p - p5.js instance
+ * @param {HarpString} string - String object
+ * @param {boolean} isSelected - Whether string is selected
+ * @param {boolean} isHovered - Whether string is hovered
+ */
+function drawStringInDrawMode(p, string, isSelected, isHovered) {
+    // Check if endpoints are set
+    if (string.startX === null || string.endX === null) {
+        return; // String not yet placed
+    }
+
+    // Get material color for this string
+    const materialColor = string.color || VISUAL_CONSTANTS.COLORS.stringInactive;
+    const matteColor = [
+        Math.floor(materialColor[0] * 0.8),
+        Math.floor(materialColor[1] * 0.8),
+        Math.floor(materialColor[2] * 0.8)
+    ];
+
+    // Calculate string thickness based on gauge
+    const gaugeData = STRING_GAUGES[string.gauge];
+    const baseThickness = gaugeData ? (gaugeData.diameter * 10) : 4;
+    const stringThickness = Math.max(4, baseThickness * 1.2);
+
+    // Draw the string line
+    if (string.isPlaying) {
+        // Animated vibration effect
+        const vibrationAmount = string.playingAmplitude * 5;
+        const midX = (string.startX + string.endX) / 2;
+        const midY = (string.startY + string.endY) / 2;
+
+        // Calculate perpendicular offset for vibration
+        const dx = string.endX - string.startX;
+        const dy = string.endY - string.startY;
+        const length = Math.sqrt(dx * dx + dy * dy);
+        const perpX = -dy / length;
+        const perpY = dx / length;
+
+        const vibrationX = Math.sin(p.frameCount * 0.3) * vibrationAmount;
+        const offsetX = perpX * vibrationX;
+        const offsetY = perpY * vibrationX;
+
+        // Glow effect
+        p.stroke(matteColor[0], matteColor[1], matteColor[2], 120);
+        p.strokeWeight(stringThickness * 3);
+        p.line(
+            string.startX + offsetX, string.startY + offsetY,
+            string.endX + offsetX, string.endY + offsetY
+        );
+
+        // Main vibrating string
+        p.stroke(matteColor[0], matteColor[1], matteColor[2], 255);
+        p.strokeWeight(stringThickness * 1.8);
+        p.line(
+            string.startX + offsetX, string.startY + offsetY,
+            string.endX + offsetX, string.endY + offsetY
+        );
+    } else {
+        // Static string
+        if (isSelected) {
+            // Selected: black outline
+            p.stroke(0, 0, 0);
+            p.strokeWeight(stringThickness * 1.6);
+            p.line(string.startX, string.startY, string.endX, string.endY);
+
+            // Inner string with color
+            p.stroke(matteColor[0], matteColor[1], matteColor[2], 255);
+            p.strokeWeight(stringThickness * 1.3);
+            p.line(string.startX, string.startY, string.endX, string.endY);
+        } else {
+            // Normal string
+            p.stroke(matteColor[0], matteColor[1], matteColor[2], 220);
+            p.strokeWeight(stringThickness);
+            p.line(string.startX, string.startY, string.endX, string.endY);
+        }
+    }
+
+    // Draw endpoints with position coordinates (show coordinates only when interacting)
+    const showCoords = isHovered || isSelected || string.isDraggingStart || string.isDraggingEnd;
+    drawEndpoint(p, string.startX, string.startY, string.isDraggingStart, true, materialColor, p.width, p.height, showCoords);
+    drawEndpoint(p, string.endX, string.endY, string.isDraggingEnd, false, materialColor, p.width, p.height, showCoords);
+
+    // Draw string info overlay only when hovered, selected, or playing
+    if (isHovered || isSelected || string.isPlaying) {
+        const midX = (string.startX + string.endX) / 2;
+        const midY = (string.startY + string.endY) / 2;
+
+        // Calculate string length in feet and inches
+        const lengthMm = string.calculateDrawLength(p.height);
+        const lengthInches = lengthMm / 25.4;
+        const lengthFeet = Math.floor(lengthInches / 12);
+        const lengthInchesRemainder = (lengthInches % 12).toFixed(1);
+        const lengthStr = `${lengthFeet}'${lengthInchesRemainder}"`;
+
+        // Get material and gauge info
+        const materialName = STRING_MATERIALS[string.material]?.name || string.material;
+        const gaugeName = STRING_GAUGES[string.gauge]?.name || string.gauge;
+
+        // Build info text
+        const freq = string.actualFrequency.toFixed(1);
+        const line1 = `#${string.index + 1}: ${string.noteName} | ${freq}Hz`;
+        const line2 = `${lengthStr} | ${materialName} ${gaugeName}`;
+        const line3 = `${string.tension.toFixed(0)}N`;
+
+        // Calculate perpendicular offset for text (place text to the side of the string)
+        const dx = string.endX - string.startX;
+        const dy = string.endY - string.startY;
+        const length = Math.sqrt(dx * dx + dy * dy);
+        const perpX = -dy / length;
+        const perpY = dx / length;
+
+        // Offset text to the side (increased distance for better visibility)
+        const textOffsetDistance = 50;
+        const textX = midX + perpX * textOffsetDistance;
+        const textY = midY + perpY * textOffsetDistance;
+
+        // Draw semi-transparent background for better readability
+        p.textSize(11);
+        const line1Width = p.textWidth(line1);
+        p.textSize(10);
+        const line2Width = p.textWidth(line2);
+        const line3Width = p.textWidth(line3);
+        const maxWidth = Math.max(line1Width, line2Width, line3Width);
+
+        // Background rectangle
+        p.fill(255, 255, 255, 200);  // Semi-transparent white
+        p.noStroke();
+        p.rectMode(p.CENTER);
+        p.rect(textX, textY, maxWidth + 12, 42, 4);
+
+        // Draw text - bold black text
+        p.textAlign(p.CENTER, p.CENTER);
+        p.textStyle(p.BOLD);
+        p.fill(0, 0, 0);  // Bold black text
+        p.noStroke();
+
+        p.textSize(11);
+        p.text(line1, textX, textY - 12);
+        p.textSize(10);
+        p.text(line2, textX, textY + 2);
+        p.text(line3, textX, textY + 13);
+        p.textStyle(p.NORMAL);
+    }
+}
+
+/**
  * Draw a single string with proper capo visualization
  *
  * @param {p5} p - p5.js instance
  * @param {HarpString} string - String object to draw
  * @param {boolean} isSelected - Whether this string is selected
+ * @param {string} currentMode - Current interaction mode
+ * @param {boolean} isHovered - Whether this string is hovered
  */
-function drawString(p, string, isSelected) {
+function drawString(p, string, isSelected, currentMode, isHovered = false) {
+    // Only show draw mode strings when in DRAW mode
+    if (currentMode === INTERACTION_CONSTANTS.MODES.DRAW && string.drawMode && string.startX !== null) {
+        drawStringInDrawMode(p, string, isSelected, isHovered);
+        return;
+    }
+
+    // In DRAW mode, don't show vertical strings
+    if (currentMode === INTERACTION_CONSTANTS.MODES.DRAW) {
+        return;
+    }
+
+    // Original vertical string drawing code below (UNCHANGED)
     const x = (string.index + 0.5) * (p.width / string.totalStrings);
 
     // Calculate Y positions
@@ -363,18 +626,36 @@ function drawPlayingStringInfo(p, strings) {
  * Draw keyboard shortcuts help overlay
  *
  * @param {p5} p - p5.js instance
+ * @param {string} currentMode - Current interaction mode
  */
-function drawKeyboardShortcuts(p) {
-    const shortcuts = [
-        '← → : SELECT STRING',
-        '↑ ↓ : MOVE CAPO (10mm)',
-        'SHIFT+↑↓ : SWITCH CAPO',
-        '+ - : SEMITONE',
-        'PgUp/PgDn : OCTAVE',
-        'SPACE : PLUCK',
-        '1-3 : MODE',
-        'T : TEST AUDIO'
-    ];
+function drawKeyboardShortcuts(p, currentMode) {
+    let shortcuts;
+
+    if (currentMode === INTERACTION_CONSTANTS.MODES.DRAW) {
+        // Draw mode shortcuts - no capo controls
+        shortcuts = [
+            '← → : SELECT STRING',
+            'SHIFT+CLICK : PLACE STRING',
+            'DRAG : MOVE ENDPOINT',
+            'CLICK : PLUCK',
+            'DEL : DELETE STRING',
+            'SPACE : PLUCK',
+            '1-4 : MODE',
+            'T : TEST AUDIO'
+        ];
+    } else {
+        // Standard mode shortcuts - include capo controls
+        shortcuts = [
+            '← → : SELECT STRING',
+            '↑ ↓ : MOVE CAPO (10mm)',
+            'SHIFT+↑↓ : SWITCH CAPO',
+            '+ - : SEMITONE',
+            'PgUp/PgDn : OCTAVE',
+            'SPACE : PLUCK',
+            '1-4 : MODE',
+            'T : TEST AUDIO'
+        ];
+    }
 
     const x = p.width - 15;
     const startY = 60;  // Increased from 50 for more padding

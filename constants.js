@@ -274,11 +274,14 @@ const INTERACTION_CONSTANTS = {
     MODES: {
         PLUCK: 'pluck',
         ADJUST: 'adjust',
-        PATTERN: 'pattern'
+        PATTERN: 'pattern',
+        DRAW: 'draw'  // NEW: Free-form string drawing mode
     },
     VIBRATION_DECAY: 0.95,
     MIN_AMPLITUDE: 0.01,
-    DRAG_PLUCK_INTERVAL: 100  // ms between auto-plucks while dragging
+    DRAG_PLUCK_INTERVAL: 100,  // ms between auto-plucks while dragging
+    ENDPOINT_GRAB_THRESHOLD: 20,  // Pixels - how close to click to grab an endpoint
+    DRAW_MODE_MARGIN: 40  // Pixels - margin from canvas edge for string placement
 };
 
 // ===== AUDIO ENGINE TYPES =====
