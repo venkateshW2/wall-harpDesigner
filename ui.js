@@ -982,28 +982,8 @@ function initializeUIControls(app) {
                 return;
             }
 
-            // Gather project state
-            const projectData = {
-                version: '1.0',
-                timestamp: new Date().toISOString(),
-                numStrings: app.numStrings,
-                currentMaterial: app.currentMaterial,
-                currentGauge: app.currentGauge,
-                currentTension: app.currentTension,
-                currentAudioEngine: app.currentAudioEngine,
-                strings: app.strings.map(string => ({
-                    index: string.index,
-                    targetMidiNote: string.targetMidiNote,
-                    material: string.material,
-                    gauge: string.gauge,
-                    tension: string.tension,
-                    lowerCapoMm: string.lowerCapoMm,
-                    upperCapoMm: string.upperCapoMm
-                }))
-            };
-
-            // Download as JSON
-            const jsonString = JSON.stringify(projectData, null, 2);
+            // Use the v2.0 exportConfiguration function from utils.js
+            const jsonString = exportConfiguration(app.strings);
             const blob = new Blob([jsonString], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -1023,83 +1003,27 @@ function initializeUIControls(app) {
             loadProjectFile.click();
         });
 
-        loadProjectFile.addEventListener('change', (e) => {
+        loadProjectFile.addEventListener('change', async (e) => {
             const file = e.target.files[0];
             if (!file) return;
 
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                try {
-                    const projectData = JSON.parse(event.target.result);
-
-                    // Validate project data
-                    if (!projectData.version || !projectData.strings) {
-                        throw new Error('Invalid project file');
-                    }
-
-                    // Set string count first
-                    if (projectData.numStrings) {
-                        app.setStringCount(projectData.numStrings);
-                    }
-
-                    // Load string configurations
-                    projectData.strings.forEach((stringData, index) => {
-                        if (index < app.strings.length) {
-                            const string = app.strings[index];
-
-                            // Set material properties
-                            string.setMaterial(
-                                stringData.material || 'steel',
-                                stringData.gauge || 'medium',
-                                stringData.tension || 120
-                            );
-
-                            // Set capo positions
-                            if (stringData.lowerCapoMm !== undefined) {
-                                string.lowerCapoMm = stringData.lowerCapoMm;
-                            }
-                            if (stringData.upperCapoMm !== undefined) {
-                                string.upperCapoMm = stringData.upperCapoMm;
-                            }
-
-                            // Set target MIDI note
-                            if (stringData.targetMidiNote !== undefined) {
-                                string.targetMidiNote = stringData.targetMidiNote;
-                                string.targetFrequency = midiToFrequency(stringData.targetMidiNote);
-                            }
-                        }
-                    });
-
-                    // Set global material properties
-                    if (projectData.currentMaterial) {
-                        app.currentMaterial = projectData.currentMaterial;
-                    }
-                    if (projectData.currentGauge) {
-                        app.currentGauge = projectData.currentGauge;
-                    }
-                    if (projectData.currentTension) {
-                        app.currentTension = projectData.currentTension;
-                    }
-
-                    // Set audio engine
-                    if (projectData.currentAudioEngine && audioEngine && audioEngine.initialized) {
-                        app.setAudioEngine(projectData.currentAudioEngine);
-                    }
-
+            try {
+                // Use the v2.0 importConfiguration function from utils.js
+                const success = await loadConfigurationFromFile(file, app.strings);
+                if (success) {
                     app.updateUI();
+                    app.redraw();
                     showNotification('Project loaded successfully', 'success');
-
-                    // Reset file input
-                    loadProjectFile.value = '';
-
-                } catch (error) {
-                    console.error('Error loading project:', error);
-                    showNotification('Failed to load project: ' + error.message, 'error');
-                    loadProjectFile.value = '';
+                } else {
+                    showNotification('Failed to load project', 'error');
                 }
-            };
+            } catch (error) {
+                console.error('Error loading project:', error);
+                showNotification('Failed to load project: ' + error.message, 'error');
+            }
 
-            reader.readAsText(file);
+            // Reset file input
+            loadProjectFile.value = '';
         });
     }
 

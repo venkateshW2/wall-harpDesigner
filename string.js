@@ -378,7 +378,15 @@ function exportToCSV(strings) {
         'Lower Capo (mm)',
         'Upper Capo (mm)',
         'Lower Capo (ft)',
-        'Upper Capo (ft)'
+        'Upper Capo (ft)',
+        'Material',
+        'Gauge',
+        'Tension (N)',
+        'Draw Mode',
+        'Draw Start X',
+        'Draw Start Y',
+        'Draw End X',
+        'Draw End Y'
     ];
 
     const rows = strings.map(s => {
@@ -395,7 +403,15 @@ function exportToCSV(strings) {
             data.lowerCapoMm,
             data.upperCapoMm,
             data.lowerCapoFeet,
-            data.upperCapoFeet
+            data.upperCapoFeet,
+            s.material,
+            s.gauge,
+            s.tension,
+            s.drawMode,
+            s.startX || '',
+            s.startY || '',
+            s.endX || '',
+            s.endY || ''
         ];
     });
 
