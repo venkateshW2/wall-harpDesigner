@@ -1027,6 +1027,87 @@ function initializeUIControls(app) {
         });
     }
 
+    // Sequencer controls
+    const sequenceInput = document.getElementById('sequenceInput');
+    const sequencerTempo = document.getElementById('sequencerTempo');
+    const sequencerTempoValue = document.getElementById('sequencerTempoValue');
+    const sequencerPlay = document.getElementById('sequencerPlay');
+    const sequencerStop = document.getElementById('sequencerStop');
+    const sequencerLoopOn = document.getElementById('sequencerLoopOn');
+    const sequencerLoopOff = document.getElementById('sequencerLoopOff');
+
+    // Set app reference in sequencer
+    if (typeof sequencer !== 'undefined') {
+        sequencer.setApp(app);
+    }
+
+    // Tempo slider
+    if (sequencerTempo && sequencerTempoValue) {
+        sequencerTempo.addEventListener('input', (e) => {
+            const tempo = parseInt(e.target.value);
+            sequencerTempoValue.textContent = tempo + ' BPM';
+            if (typeof sequencer !== 'undefined') {
+                sequencer.setTempo(tempo);
+            }
+        });
+    }
+
+    // Play button
+    if (sequencerPlay && sequenceInput) {
+        sequencerPlay.addEventListener('click', () => {
+            if (typeof sequencer === 'undefined') {
+                showNotification('Sequencer not loaded', 'error');
+                return;
+            }
+
+            const sequenceString = sequenceInput.value.trim();
+            if (!sequenceString) {
+                showNotification('Please enter a sequence', 'warning');
+                return;
+            }
+
+            // Parse and set sequence
+            const valid = sequencer.setSequence(sequenceString);
+            if (!valid) {
+                showNotification('Invalid sequence format. Use comma-separated numbers (e.g., 1, 2, 3)', 'error');
+                return;
+            }
+
+            // Start playback
+            sequencer.play();
+            showNotification('Sequencer started', 'success');
+        });
+    }
+
+    // Stop button
+    if (sequencerStop) {
+        sequencerStop.addEventListener('click', () => {
+            if (typeof sequencer !== 'undefined') {
+                sequencer.stop();
+                showNotification('Sequencer stopped', 'info');
+            }
+        });
+    }
+
+    // Loop toggle
+    if (sequencerLoopOn && sequencerLoopOff) {
+        sequencerLoopOn.addEventListener('click', () => {
+            sequencerLoopOn.classList.add('active');
+            sequencerLoopOff.classList.remove('active');
+            if (typeof sequencer !== 'undefined') {
+                sequencer.setLoop(true);
+            }
+        });
+
+        sequencerLoopOff.addEventListener('click', () => {
+            sequencerLoopOff.classList.add('active');
+            sequencerLoopOn.classList.remove('active');
+            if (typeof sequencer !== 'undefined') {
+                sequencer.setLoop(false);
+            }
+        });
+    }
+
     console.log("UI controls initialized");
 }
 
